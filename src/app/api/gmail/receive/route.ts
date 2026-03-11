@@ -62,7 +62,11 @@ export async function POST(request: Request) {
     const monthKey = `${receivedDate.getFullYear()}-${String(receivedDate.getMonth() + 1).padStart(2, '0')}`;
 
     const docId = crypto.randomUUID();
-    const storagePath = `${monthKey}/${docId}/${payload.fileName}`;
+    // Sanitize filename: remove accents, special chars for storage path
+    const safeFileName = payload.fileName
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-zA-Z0-9._-]/g, '_'); // Replace special chars
+    const storagePath = `${monthKey}/${docId}/${safeFileName}`;
 
     // Upload to storage
     const { error: uploadError } = await supabase.storage
