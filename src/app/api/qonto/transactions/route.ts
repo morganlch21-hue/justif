@@ -1,10 +1,11 @@
 import { listTransactions, getMonthRange } from '@/lib/qonto';
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: Request) {
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const month = searchParams.get('month');
+    const month = request.nextUrl.searchParams.get('month');
 
     if (!month) {
       return NextResponse.json({ error: 'Paramètre month requis' }, { status: 400 });
