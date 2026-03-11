@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     // Collect all months we need transactions for
-    const monthKeys = [...new Set(docs.map(d => d.month_key))];
+    const monthKeys = Array.from(new Set(docs.map(d => d.month_key)));
     const allTransactions: QontoTransactionAPI[] = [];
 
     for (const mk of monthKeys) {
