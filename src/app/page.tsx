@@ -7,7 +7,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import {
   FileText, Camera, FolderOpen,
-  CheckCircle, Clock, Receipt, RefreshCw, Loader2
+  CheckCircle, Clock, Receipt, RefreshCw, Loader2,
+  TrendingDown, TrendingUp, Send, AlertTriangle
 } from 'lucide-react';
 import { getCurrentMonthKey, type AccountingDocument, type QontoTransaction } from '@/lib/types';
 import { toast } from 'sonner';
@@ -118,120 +119,128 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick actions */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Link href="/ticket">
-            <Card className="cursor-pointer transition-all duration-200 hover:apple-shadow-hover hover:scale-[1.02]">
-              <CardContent className="flex flex-col items-center gap-2.5 p-5">
-                <Camera className="h-7 w-7 text-primary" />
-                <span className="text-sm font-medium">Ticket resto</span>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/documents">
-            <Card className="cursor-pointer transition-all duration-200 hover:apple-shadow-hover hover:scale-[1.02]">
-              <CardContent className="flex flex-col items-center gap-2.5 p-5">
-                <FolderOpen className="h-7 w-7 text-primary" />
-                <span className="text-sm font-medium">Documents</span>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link href="/documents">
-            <Card className="cursor-pointer transition-all duration-200 hover:apple-shadow-hover hover:scale-[1.02]">
-              <CardContent className="flex flex-col items-center gap-2.5 p-5 relative">
-                <Clock className="h-7 w-7 text-amber-500" />
-                <span className="text-sm font-medium">À vérifier</span>
-                {stats && stats.toVerify > 0 && (
-                  <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-semibold text-white">
-                    {stats.toVerify}
-                  </span>
-                )}
-              </CardContent>
-            </Card>
-          </Link>
-          <Card className="cursor-pointer transition-all duration-200 hover:apple-shadow-hover hover:scale-[1.02]" onClick={autoPushQonto}>
-            <CardContent className="flex flex-col items-center gap-2.5 p-5">
-              <Receipt className="h-7 w-7 text-primary" />
-              <span className="text-sm font-medium">Sync Qonto</span>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { href: '/ticket', icon: Camera, label: 'Ticket', color: 'text-primary', bg: 'bg-primary/10' },
+            { href: '/documents', icon: FolderOpen, label: 'Docs', color: 'text-blue-500', bg: 'bg-blue-50' },
+            { href: '/documents', icon: Clock, label: 'Vérifier', color: 'text-amber-500', bg: 'bg-amber-50', badge: stats?.toVerify },
+            { href: '#', icon: Receipt, label: 'Qonto', color: 'text-green-600', bg: 'bg-green-50', onClick: autoPushQonto },
+          ].map((action) => (
+            <Link key={action.label} href={action.href} onClick={action.onClick ? (e) => { e.preventDefault(); action.onClick(); } : undefined}>
+              <Card className="cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]">
+                <CardContent className="flex flex-col items-center gap-1.5 p-3 relative">
+                  <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", action.bg)}>
+                    <action.icon className={cn("h-5 w-5", action.color)} />
+                  </div>
+                  <span className="text-[11px] font-medium">{action.label}</span>
+                  {action.badge && action.badge > 0 && (
+                    <span className="absolute right-2 top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-white">
+                      {action.badge}
+                    </span>
+                  )}
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
         </div>
 
         {/* Stats */}
         {loading ? (
-          <Card>
-            <CardContent className="p-0">
-              <div className="grid grid-cols-2 sm:grid-cols-5">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className={cn("p-5 text-center", i > 0 && "border-l")}>
-                    <Skeleton className="mx-auto h-8 w-12 rounded-lg" />
-                    <Skeleton className="mx-auto mt-2 h-3 w-16 rounded" />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2, 3, 4].map(i => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <Skeleton className="h-4 w-16 mb-2" />
+                  <Skeleton className="h-7 w-20" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         ) : stats && (
           <>
-            <Card>
-              <CardContent className="p-0">
-                <div className="grid grid-cols-2 sm:grid-cols-5">
-                  <div className="p-5 text-center">
-                    <p className="text-3xl font-semibold tracking-tight">{stats.totalDocs}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Documents</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+                      <FolderOpen className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">Documents</span>
                   </div>
-                  <div className="border-l p-5 text-center">
-                    <p className="text-3xl font-semibold tracking-tight">{stats.supplierInvoices}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Fournisseurs</p>
+                  <p className="text-xl font-bold tracking-tight">{stats.totalDocs}</p>
+                  <p className="text-[10px] text-muted-foreground">{stats.supplierInvoices} fourn. · {stats.clientInvoices} clients · {stats.tickets} tickets</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50">
+                      <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">Fournisseurs</span>
                   </div>
-                  <div className="border-l p-5 text-center">
-                    <p className="text-3xl font-semibold tracking-tight">{stats.clientInvoices}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Clients</p>
+                  <p className="text-xl font-bold tracking-tight">{stats.supplierInvoices}</p>
+                  <p className="text-[10px] text-muted-foreground">factures fournisseur</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-50">
+                      <TrendingUp className="h-3.5 w-3.5 text-green-600" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">Clients</span>
                   </div>
-                  <div className="border-l p-5 text-center">
-                    <p className="text-3xl font-semibold tracking-tight">{stats.tickets}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Tickets</p>
+                  <p className="text-xl font-bold tracking-tight">{stats.clientInvoices}</p>
+                  <p className="text-[10px] text-muted-foreground">factures client</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50">
+                      <Send className="h-3.5 w-3.5 text-blue-500" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">Qonto</span>
                   </div>
-                  <div className="border-l p-5 text-center">
-                    <p className="text-3xl font-semibold tracking-tight">{stats.sentToQonto}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Envoyés Qonto</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  <p className="text-xl font-bold tracking-tight">{stats.sentToQonto}</p>
+                  <p className="text-[10px] text-muted-foreground">envoyés sur Qonto</p>
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Missing invoices alert */}
             {stats.missingInvoices.length > 0 && (
-              <div className="rounded-xl bg-amber-50 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="flex h-2 w-2 rounded-full bg-amber-500" />
-                  <p className="text-sm font-medium text-amber-900">
-                    {stats.missingInvoices.length} paiement(s) sans facture
-                  </p>
-                </div>
-                <p className="mb-3 text-sm text-amber-700/80">
-                  Pensez à télécharger les factures depuis les plateformes concernées.
-                </p>
-                <div className="space-y-1.5">
-                  {stats.missingInvoices.slice(0, 5).map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-sm">
-                      <div>
-                        <span className="font-medium">{tx.counterparty_name || 'Inconnu'}</span>
-                        <span className="ml-2 text-muted-foreground">
-                          {new Date(tx.settled_at).toLocaleDateString('fr-FR')}
+              <Card className="border-amber-200 bg-amber-50/50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <p className="text-sm font-medium text-amber-900">
+                      {stats.missingInvoices.length} paiement(s) sans facture
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    {stats.missingInvoices.slice(0, 5).map((tx) => (
+                      <div key={tx.id} className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-sm">
+                        <div className="min-w-0 flex-1">
+                          <span className="font-medium truncate">{tx.counterparty_name || 'Inconnu'}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {new Date(tx.settled_at).toLocaleDateString('fr-FR')}
+                          </span>
+                        </div>
+                        <span className="font-semibold tabular-nums text-amber-800 text-sm shrink-0">
+                          {(Math.abs(tx.amount_cents) / 100).toFixed(2)} €
                         </span>
                       </div>
-                      <span className="font-medium tabular-nums text-amber-800">
-                        {(tx.amount_cents / 100).toFixed(2)} {tx.currency}
-                      </span>
-                    </div>
-                  ))}
-                  {stats.missingInvoices.length > 5 && (
-                    <p className="text-xs text-amber-600 pl-3">
-                      + {stats.missingInvoices.length - 5} autre(s)
-                    </p>
-                  )}
-                </div>
-              </div>
+                    ))}
+                    {stats.missingInvoices.length > 5 && (
+                      <p className="text-xs text-amber-600 pl-3">
+                        + {stats.missingInvoices.length - 5} autre(s)
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {stats.totalDocs === 0 && stats.missingInvoices.length === 0 && (

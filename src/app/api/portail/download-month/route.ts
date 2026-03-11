@@ -1,7 +1,9 @@
 import { createServiceClient } from '@/lib/supabase';
-import { createHash } from 'crypto';
+import { validatePortailToken } from '@/lib/portail-auth';
 import { NextResponse } from 'next/server';
 import JSZip from 'jszip';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
@@ -13,20 +15,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
     }
 
-    const supabase = createServiceClient();
-
-    // Validate token
-    const tokenHash = createHash('sha256').update(token).digest('hex');
-    const { data: validToken } = await supabase
-      .from('accounting_portail_tokens')
-      .select('id')
-      .eq('token_hash', tokenHash)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (!validToken) {
+    const { valid } = await validatePortailToken(token);
+    if (!valid) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
     }
+
+    const supabase = createServiceClient();
 
     // Get all confirmed documents for this month
     const { data: docs } = await supabase
@@ -71,6 +65,19 @@ export async function GET(request: Request) {
         zip.file(`${folder}/${fileName}`, arrayBuffer);
       }
     }
+
+    // Add CSV summary
+    const csvHeader = 'Date,Titre,Type,Catégorie,Montant,Fichier,Qonto\n';
+    const csvRows = docs.map(doc => {
+      const date = new Date(doc.created_at).toLocaleDateString('fr-FR');
+      const type = doc.type === 'invoice' ? 'Facture' : 'Ticket';
+      const cat = doc.type === 'invoice' ? (doc.category === 'client' ? 'Client' : 'Fournisseur') : '';
+      const amount = doc.amount_cents ? (doc.amount_cents / 100).toFixed(2) : '';
+      const qonto = doc.qonto_attachment_sent ? 'Oui' : 'Non';
+      const title = doc.title.replace(/"/g, '""');
+      return `${date},"${title}",${type},${cat},${amount},"${doc.file_name}",${qonto}`;
+    }).join('\n');
+    zip.file('_resume.csv', '\uFEFF' + csvHeader + csvRows); // BOM for Excel
 
     const zipBuffer = await zip.generateAsync({ type: 'arraybuffer' });
     const safeName = `ML-Consulting_${month}.zip`;

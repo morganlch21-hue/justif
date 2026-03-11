@@ -81,6 +81,33 @@ export interface GmailReceivePayload {
   emailAccount: string;
 }
 
+export interface PortailNote {
+  id: string;
+  document_id: string;
+  token_id: string;
+  note: string;
+  flag: 'ok' | 'missing_info' | 'duplicate' | 'question' | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PortailSummary {
+  totalDocs: number;
+  supplierCount: number;
+  supplierAmount: number;
+  clientCount: number;
+  clientAmount: number;
+  ticketCount: number;
+  totalDebitTransactions: number;
+  missingCount: number;
+  reconciliationRate: number;
+}
+
+export interface ReconciliationItem {
+  transaction: QontoTransaction;
+  document: AccountingDocument | null;
+}
+
 // Helpers
 export function getCurrentMonthKey(): string {
   const now = new Date();
