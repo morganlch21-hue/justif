@@ -71,24 +71,6 @@ export default function DashboardPage() {
     fetchStats();
   }, [fetchStats]);
 
-  async function syncQonto() {
-    setSyncing(true);
-    try {
-      const res = await fetch(`/api/qonto/sync?month=${month}`, { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(`${data.synced} transactions synchronisées, ${data.missingInvoices} sans facture`);
-        fetchStats();
-      } else {
-        toast.error(data.error || 'Erreur sync');
-      }
-    } catch {
-      toast.error('Erreur de synchronisation');
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   async function autoPushQonto() {
     setSyncing(true);
     try {
