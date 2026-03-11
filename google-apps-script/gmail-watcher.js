@@ -2,7 +2,7 @@
  * Gmail Watcher - Google Apps Script
  *
  * Ce script surveille un compte Gmail toutes les 15 minutes
- * et envoie les factures détectées vers l'app Compta.
+ * et envoie les factures détectées vers l'app Justif.
  *
  * INSTALLATION :
  * 1. Aller sur https://script.google.com
@@ -23,11 +23,11 @@ function getConfig() {
   return {
     API_ENDPOINT: props.getProperty('API_ENDPOINT'),
     API_SECRET: props.getProperty('API_SECRET'),
-    LABEL_PROCESSED: 'Compta/Traite',
-    LABEL_DOUBT: 'Compta/Doute',
-    LABEL_IGNORED: 'Compta/Ignore',
+    LABEL_PROCESSED: 'Justif/Traite',
+    LABEL_DOUBT: 'Justif/Doute',
+    LABEL_IGNORED: 'Justif/Ignore',
     // Recherche : emails avec PJ, non traités, des 90 derniers jours
-    SEARCH_QUERY: 'has:attachment -label:Compta/Traite -label:Compta/Ignore -label:Compta/Doute newer_than:90d',
+    SEARCH_QUERY: 'has:attachment -label:Justif/Traite -label:Justif/Ignore -label:Justif/Doute newer_than:90d',
   };
 }
 

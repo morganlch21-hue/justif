@@ -7,7 +7,7 @@ import { Toaster } from "sonner";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "Compta - Gestion des factures et tickets",
+  title: "Justif - Gestion des factures et tickets",
   description: "Automatisation comptable : factures, tickets restaurant, portail comptable",
   manifest: "/manifest.json",
 };

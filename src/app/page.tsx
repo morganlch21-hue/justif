@@ -102,7 +102,7 @@ export default function DashboardPage() {
         <div className="mx-auto flex max-w-4xl items-center justify-between">
           <div className="flex items-center gap-3">
             <FileText className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-semibold">Compta</h1>
+            <h1 className="text-xl font-semibold">Justif</h1>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={handleLogout}>

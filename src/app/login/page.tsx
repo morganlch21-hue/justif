@@ -55,7 +55,7 @@ function LoginForm() {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <FileText className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Compta</CardTitle>
+          <CardTitle className="text-2xl">Justif</CardTitle>
           <CardDescription>Gestion des factures et tickets</CardDescription>
         </CardHeader>
         <CardContent>

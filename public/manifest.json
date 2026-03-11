@@ -1,6 +1,6 @@
 {
-  "name": "Compta - Factures & Tickets",
-  "short_name": "Compta",
+  "name": "Justif - Factures & Tickets",
+  "short_name": "Justif",
   "start_url": "/ticket",
   "display": "standalone",
   "background_color": "#ffffff",
