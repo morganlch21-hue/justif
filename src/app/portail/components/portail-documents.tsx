@@ -137,7 +137,7 @@ export function PortailDocuments({ token, month }: Props) {
                       {doc.type === 'invoice' && ` · ${doc.category === 'client' ? 'Client' : 'Fourn.'}`}
                       {doc.amount_cents ? ` · ${(doc.amount_cents / 100).toFixed(2)} €` : ''}
                       {' · '}
-                      {new Date(doc.created_at).toLocaleDateString('fr-FR')}
+                      {new Date(doc.gmail_received_at || doc.created_at).toLocaleDateString('fr-FR')}
                       {doc.qonto_attachment_sent && ' · ✓ Qonto'}
                     </p>
                   </div>

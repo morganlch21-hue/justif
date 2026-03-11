@@ -37,8 +37,8 @@ export async function GET(request: Request) {
 
     const all = transactions || [];
 
-    const matched = all.filter(t => t.side === 'debit' && (t.matched_document || t.has_attachment));
-    const unmatched = all.filter(t => t.side === 'debit' && !t.matched_document && !t.has_attachment);
+    const matched = all.filter(t => t.side === 'debit' && t.matched_document);
+    const unmatched = all.filter(t => t.side === 'debit' && !t.matched_document);
     const credits = all.filter(t => t.side === 'credit');
 
     return NextResponse.json({ matched, unmatched, credits });

@@ -31,6 +31,7 @@ export async function GET(request: Request) {
       .is('matched_document_id', null)
       .gte('settled_at', monthStart)
       .lt('settled_at', monthEnd)
+      .gt('amount_cents', 100) // Filter out micro-transactions (< 1€)
       .order('settled_at', { ascending: false });
 
     if (error) {

@@ -31,6 +31,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [showAllMissing, setShowAllMissing] = useState(false);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -220,7 +221,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <div className="space-y-1.5">
-                    {stats.missingInvoices.slice(0, 5).map((tx) => (
+                    {(showAllMissing ? stats.missingInvoices : stats.missingInvoices.slice(0, 5)).map((tx) => (
                       <div key={tx.id} className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-sm">
                         <div className="min-w-0 flex-1">
                           <span className="font-medium truncate">{tx.counterparty_name || 'Inconnu'}</span>
@@ -233,10 +234,21 @@ export default function DashboardPage() {
                         </span>
                       </div>
                     ))}
-                    {stats.missingInvoices.length > 5 && (
-                      <p className="text-xs text-amber-600 pl-3">
+                    {stats.missingInvoices.length > 5 && !showAllMissing && (
+                      <button
+                        onClick={() => setShowAllMissing(true)}
+                        className="text-xs text-amber-600 pl-3 hover:text-amber-800 hover:underline cursor-pointer"
+                      >
                         + {stats.missingInvoices.length - 5} autre(s)
-                      </p>
+                      </button>
+                    )}
+                    {showAllMissing && stats.missingInvoices.length > 5 && (
+                      <button
+                        onClick={() => setShowAllMissing(false)}
+                        className="text-xs text-amber-600 pl-3 hover:text-amber-800 hover:underline cursor-pointer"
+                      >
+                        Voir moins
+                      </button>
                     )}
                   </div>
                 </CardContent>

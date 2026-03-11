@@ -158,6 +158,32 @@ export function findMatchingTransaction(
   return bestMatch;
 }
 
+export async function removeAttachment(
+  transactionId: string,
+  attachmentId: string
+) {
+  const res = await fetch(
+    `${QONTO_BASE_URL}/transactions/${transactionId}/attachments/${attachmentId}`,
+    {
+      method: 'DELETE',
+      headers: getHeaders(),
+    }
+  );
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(`Qonto delete error: ${res.status} - ${error}`);
+  }
+}
+
+export async function getTransaction(transactionId: string) {
+  const res = await fetch(
+    `${QONTO_BASE_URL}/transactions/${transactionId}`,
+    { headers: getHeaders() }
+  );
+  if (!res.ok) throw new Error(`Qonto API error: ${res.status}`);
+  return res.json();
+}
+
 // Get month range for querying transactions
 export function getMonthRange(monthKey: string) {
   const [year, month] = monthKey.split('-').map(Number);

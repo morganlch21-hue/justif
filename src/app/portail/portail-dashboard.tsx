@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FileText } from 'lucide-react';
 import { MonthSelector } from '@/components/MonthSelector';
 import { getCurrentMonthKey } from '@/lib/types';
@@ -17,6 +17,18 @@ interface Props {
 export function PortailDashboard({ token }: Props) {
   const [month, setMonth] = useState(getCurrentMonthKey());
   const [missingCount, setMissingCount] = useState(0);
+
+  // Fetch missing count eagerly so the badge updates on month change
+  useEffect(() => {
+    fetch(`/api/portail/missing?month=${month}&token=${token}`)
+      .then(r => r.json())
+      .then(data => setMissingCount((data.transactions || []).length))
+      .catch(() => setMissingCount(0));
+  }, [month, token]);
+
+  const handleMissingCount = useCallback((count: number) => {
+    setMissingCount(count);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background animate-fade-in">
@@ -63,7 +75,7 @@ export function PortailDashboard({ token }: Props) {
           </TabsContent>
 
           <TabsContent value="missing" className="mt-4">
-            <PortailMissing token={token} month={month} onCountChange={setMissingCount} />
+            <PortailMissing token={token} month={month} onCountChange={handleMissingCount} />
           </TabsContent>
         </Tabs>
       </main>
