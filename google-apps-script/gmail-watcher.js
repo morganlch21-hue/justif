@@ -89,6 +89,12 @@ function processNewInvoices() {
       for (var a = 0; a < validAttachments.length; a++) {
         var attachment = validAttachments[a];
 
+        // Limiter à 3MB pour rester sous la limite Vercel (4.5MB avec base64)
+        if (attachment.getSize() > 3 * 1024 * 1024) {
+          Logger.log('Fichier trop gros (' + Math.round(attachment.getSize() / 1024 / 1024) + 'MB), ignoré: ' + attachment.getName());
+          continue;
+        }
+
         var payload = {
           messageId: message.getId(),
           subject: subject,

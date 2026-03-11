@@ -15,6 +15,8 @@ interface GmailPayload {
   matchedKeywords: string[];
 }
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     // Validate webhook secret
@@ -71,8 +73,8 @@ export async function POST(request: Request) {
       });
 
     if (uploadError) {
-      console.error('Storage error:', uploadError);
-      return NextResponse.json({ error: 'Erreur stockage' }, { status: 500 });
+      console.error('Storage error:', JSON.stringify(uploadError));
+      return NextResponse.json({ error: 'Erreur stockage', details: uploadError.message }, { status: 500 });
     }
 
     // Extract sender name for title
