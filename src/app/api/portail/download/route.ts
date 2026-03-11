@@ -50,10 +50,12 @@ export async function GET(request: Request) {
 
     const buffer = Buffer.from(await fileData.arrayBuffer());
 
+    const inline = searchParams.get('inline') === '1';
+
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': doc.file_type,
-        'Content-Disposition': `attachment; filename="${doc.file_name}"`,
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${doc.file_name}"`,
         'Content-Length': buffer.length.toString(),
       },
     });

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, Search, FileText, ImageIcon, MessageSquare, FolderOpen } from 'lucide-react';
+import { Download, Search, FileText, ImageIcon, MessageSquare, FolderOpen, Eye } from 'lucide-react';
 import type { AccountingDocument } from '@/lib/types';
 import { PortailNoteDialog } from './portail-note-dialog';
 
@@ -135,12 +135,16 @@ export function PortailDocuments({ token, month }: Props) {
                     <p className="text-[11px] text-muted-foreground">
                       {doc.type === 'invoice' ? 'Facture' : 'Ticket'}
                       {doc.type === 'invoice' && ` · ${doc.category === 'client' ? 'Client' : 'Fourn.'}`}
-                      {doc.amount_cents ? ` · ${(doc.amount_cents / 100).toFixed(2)} €` : ''}
                       {' · '}
                       {new Date(doc.gmail_received_at || doc.created_at).toLocaleDateString('fr-FR')}
                       {doc.qonto_attachment_sent && ' · ✓ Qonto'}
                     </p>
                   </div>
+                  {doc.amount_cents ? (
+                    <span className="text-sm font-medium tabular-nums shrink-0">
+                      {(doc.amount_cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+                    </span>
+                  ) : null}
                   <div className="flex items-center gap-1 shrink-0">
                     <Button
                       variant="ghost"
@@ -150,6 +154,11 @@ export function PortailDocuments({ token, month }: Props) {
                     >
                       <MessageSquare className={`h-4 w-4 ${note ? 'fill-current' : ''}`} />
                     </Button>
+                    <a href={`/api/portail/download?id=${doc.id}&token=${token}&inline=1`} target="_blank" rel="noopener noreferrer">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </a>
                     <a href={`/api/portail/download?id=${doc.id}&token=${token}`}>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
                         <Download className="h-4 w-4" />
