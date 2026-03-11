@@ -49,6 +49,18 @@ export default function DocumentsPage() {
     if (res.ok) {
       toast.success('Statut mis à jour');
       fetchDocuments();
+      // Auto-push to Qonto when confirming
+      if (status === 'confirmed') {
+        fetch(`/api/qonto/auto-push?documentId=${id}`, { method: 'POST' })
+          .then(r => r.json())
+          .then(data => {
+            if (data.pushed > 0) {
+              toast.success('Facture envoyée automatiquement sur Qonto');
+              fetchDocuments();
+            }
+          })
+          .catch(() => { /* silent */ });
+      }
     }
   }
 

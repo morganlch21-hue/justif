@@ -79,6 +79,67 @@ export async function uploadAttachment(
   return res.json();
 }
 
+/**
+ * Try to match a document to a Qonto transaction.
+ * Extracts keywords from sender/subject/title and compares to transaction labels.
+ * Returns the best matching transaction ID or null.
+ */
+export function findMatchingTransaction(
+  doc: { gmail_sender?: string; gmail_subject?: string; title?: string; created_at: string },
+  transactions: QontoTransactionAPI[]
+): QontoTransactionAPI | null {
+  // Only match debit transactions without attachments
+  const candidates = transactions.filter(
+    tx => tx.side === 'debit' && (!tx.attachment_ids || tx.attachment_ids.length === 0)
+  );
+
+  if (candidates.length === 0) return null;
+
+  // Extract keywords from document
+  const docText = [
+    doc.gmail_sender || '',
+    doc.gmail_subject || '',
+    doc.title || '',
+  ].join(' ').toLowerCase();
+
+  // Extract meaningful words (skip common/short words)
+  const skipWords = new Set(['facture', 'invoice', 'votre', 'your', 'pour', 'from', 'the', 'les', 'des', 'une', 'fwd', 'com', 'gmail', 'email', 'noreply', 'billing', 'no-reply', 'info', 'contact', 'hello', 'bonjour']);
+  const docWords = docText
+    .replace(/[<>@.,;:!?()[\]{}""''#€$%&*+=/\\|~`^]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !skipWords.has(w));
+
+  let bestMatch: QontoTransactionAPI | null = null;
+  let bestScore = 0;
+
+  for (const tx of candidates) {
+    const txLabel = (tx.label || '').toLowerCase().replace(/[*_\-]/g, ' ');
+    const txWords = txLabel.split(/\s+/).filter(w => w.length >= 3);
+
+    // Score: how many doc words appear in the transaction label (or vice versa)
+    let score = 0;
+    for (const dw of docWords) {
+      if (txLabel.includes(dw)) score += 2;
+    }
+    for (const tw of txWords) {
+      if (docText.includes(tw)) score += 2;
+    }
+
+    // Date proximity bonus: closer dates score higher
+    const docDate = new Date(doc.created_at).getTime();
+    const txDate = new Date(tx.settled_at).getTime();
+    const daysDiff = Math.abs(docDate - txDate) / (1000 * 60 * 60 * 24);
+    if (daysDiff <= 3) score += 1;
+
+    if (score > bestScore && score >= 4) {
+      bestScore = score;
+      bestMatch = tx;
+    }
+  }
+
+  return bestMatch;
+}
+
 // Get month range for querying transactions
 export function getMonthRange(monthKey: string) {
   const [year, month] = monthKey.split('-').map(Number);

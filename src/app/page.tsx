@@ -89,6 +89,31 @@ export default function DashboardPage() {
     }
   }
 
+  async function autoPushQonto() {
+    setSyncing(true);
+    try {
+      // First sync transactions
+      await fetch(`/api/qonto/sync?month=${month}`, { method: 'POST' });
+      // Then auto-push confirmed docs
+      const res = await fetch(`/api/qonto/auto-push?month=${month}`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.pushed > 0) {
+          toast.success(`${data.pushed} facture(s) envoyée(s) sur Qonto`);
+        } else {
+          toast.info('Aucune nouvelle facture à envoyer');
+        }
+        fetchStats();
+      } else {
+        toast.error(data.error || 'Erreur');
+      }
+    } catch {
+      toast.error('Erreur Qonto');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function handleLogout() {
     const supabase = createBrowserClient();
     await supabase.auth.signOut();
@@ -120,7 +145,7 @@ export default function DashboardPage() {
         {/* Month selector */}
         <div className="flex items-center justify-between">
           <MonthSelector value={month} onChange={setMonth} />
-          <Button variant="outline" size="sm" onClick={syncQonto} disabled={syncing}>
+          <Button variant="outline" size="sm" onClick={autoPushQonto} disabled={syncing}>
             {syncing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}
             Sync Qonto
           </Button>
@@ -155,7 +180,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </Link>
-          <Card className="cursor-pointer transition-colors hover:bg-accent" onClick={syncQonto}>
+          <Card className="cursor-pointer transition-colors hover:bg-accent" onClick={autoPushQonto}>
             <CardContent className="flex flex-col items-center gap-2 p-4">
               <Receipt className="h-8 w-8 text-primary" />
               <span className="text-sm font-medium">Sync Qonto</span>
