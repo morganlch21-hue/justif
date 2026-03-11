@@ -9,6 +9,8 @@ export async function POST(request: Request) {
     const description = formData.get('description') as string || '';
     const type = (formData.get('type') as string) || 'ticket';
     const category = (formData.get('category') as string) || 'general';
+    const amountCentsRaw = formData.get('amount_cents') as string | null;
+    const amountCents = amountCentsRaw ? parseInt(amountCentsRaw, 10) : null;
 
     if (!file) {
       return NextResponse.json({ error: 'Aucun fichier fourni' }, { status: 400 });
@@ -62,6 +64,7 @@ export async function POST(request: Request) {
         file_size_bytes: file.size,
         month_key: monthKey,
         category,
+        amount_cents: amountCents,
         status: 'confirmed',
       })
       .select()

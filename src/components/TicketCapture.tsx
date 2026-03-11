@@ -14,6 +14,7 @@ export function TicketCapture() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -29,6 +30,7 @@ export function TicketCapture() {
     setFile(null);
     setPreview(null);
     setDescription('');
+    setAmount('');
     setSuccess(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
@@ -43,6 +45,9 @@ export function TicketCapture() {
       formData.append('description', description);
       formData.append('type', 'ticket');
       formData.append('category', 'restaurant');
+      if (amount) {
+        formData.append('amount_cents', String(Math.round(parseFloat(amount) * 100)));
+      }
 
       const res = await fetch('/api/documents/upload', {
         method: 'POST',
@@ -107,6 +112,20 @@ export function TicketCapture() {
                 alt="Aperçu du ticket"
                 fill
                 className="object-contain"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="amount" className="text-xs text-muted-foreground">Montant (€)</Label>
+              <Input
+                id="amount"
+                type="number"
+                step="0.01"
+                min="0"
+                inputMode="decimal"
+                placeholder="7.90"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
               />
             </div>
 

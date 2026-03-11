@@ -87,7 +87,7 @@ export async function uploadAttachment(
  * Returns the best matching transaction or null.
  */
 export function findMatchingTransaction(
-  doc: { gmail_sender?: string; gmail_subject?: string; title?: string; created_at: string; amount_cents?: number | null },
+  doc: { gmail_sender?: string; gmail_subject?: string; title?: string; created_at: string; amount_cents?: number | null; type?: string; category?: string },
   transactions: QontoTransactionAPI[]
 ): QontoTransactionAPI | null {
   // Only match debit transactions without attachments
@@ -97,6 +97,8 @@ export function findMatchingTransaction(
 
   if (candidates.length === 0) return null;
 
+  const isTicket = doc.type === 'ticket';
+
   // Extract keywords from document
   const docText = [
     doc.gmail_sender || '',
@@ -105,7 +107,7 @@ export function findMatchingTransaction(
   ].join(' ').toLowerCase();
 
   // Extract meaningful words (skip common/short words)
-  const skipWords = new Set(['facture', 'invoice', 'votre', 'your', 'pour', 'from', 'the', 'les', 'des', 'une', 'fwd', 'com', 'gmail', 'email', 'noreply', 'billing', 'no-reply', 'info', 'contact', 'hello', 'bonjour', 'merci', 'order', 'commande', 'confirmation', 'receipt', 'recu', 'numero', 'number']);
+  const skipWords = new Set(['facture', 'invoice', 'votre', 'your', 'pour', 'from', 'the', 'les', 'des', 'une', 'fwd', 'com', 'gmail', 'email', 'noreply', 'billing', 'no-reply', 'info', 'contact', 'hello', 'bonjour', 'merci', 'order', 'commande', 'confirmation', 'receipt', 'recu', 'numero', 'number', 'dejeuner', 'déjeuner', 'diner', 'dîner', 'repas', 'ticket']);
   const docWords = docText
     .replace(/[<>@.,;:!?()[\]{}""''#€$%&*+=/\\|~`^]/g, ' ')
     .split(/\s+/)
@@ -139,11 +141,15 @@ export function findMatchingTransaction(
     const docDate = new Date(doc.created_at).getTime();
     const txDate = new Date(tx.settled_at).getTime();
     const daysDiff = Math.abs(docDate - txDate) / (1000 * 60 * 60 * 24);
-    if (daysDiff <= 3) score += 1;
+    if (daysDiff <= 1) score += 3;
+    else if (daysDiff <= 3) score += 1;
     if (daysDiff <= 7) score += 1;
 
-    // Minimum threshold: at least 2 keyword matches (score 4) or amount match + 1 keyword
-    if (score > bestScore && score >= 3) {
+    // For tickets: lower threshold since titles are generic (e.g. "Déjeuner")
+    // Match primarily on date proximity + small amount (typical restaurant/ticket amounts)
+    const threshold = isTicket ? 2 : 3;
+
+    if (score > bestScore && score >= threshold) {
       bestScore = score;
       bestMatch = tx;
     }

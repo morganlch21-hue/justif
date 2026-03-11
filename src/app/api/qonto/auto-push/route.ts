@@ -60,10 +60,13 @@ export async function POST(request: Request) {
     const results: Array<{ docId: string; title: string; txLabel: string | null; status: string }> = [];
 
     for (const doc of docs) {
-      // Only auto-push supplier invoices (not client invoices or tickets)
+      // Skip client invoices (outgoing)
       if (doc.category === 'client') continue;
 
-      const matchedTx = findMatchingTransaction(doc, allTransactions);
+      const matchedTx = findMatchingTransaction(
+        { ...doc, type: doc.type, category: doc.category },
+        allTransactions
+      );
 
       if (!matchedTx) {
         results.push({ docId: doc.id, title: doc.title, txLabel: null, status: 'no_match' });
