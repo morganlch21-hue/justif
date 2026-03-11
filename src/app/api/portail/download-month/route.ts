@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       .from('accounting_documents')
       .select('*')
       .eq('month_key', month)
-      .neq('status', 'ignored')
+      .eq('status', 'confirmed')
       .order('created_at');
 
     if (!docs || docs.length === 0) {
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
         </style>
       </head>
       <body>
-        <h1>Documents - ${month}</h1>
+        <h1>ML Consulting - Documents ${month}</h1>
         <p>${files.length} fichier(s)</p>
         ${files.map(f => `
           <div class="file">

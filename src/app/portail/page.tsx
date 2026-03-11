@@ -74,9 +74,9 @@ export default async function PortailPage({
           <div className="flex items-center gap-3">
             <FileText className="h-6 w-6 text-primary" />
             <div>
-              <h1 className="text-xl font-semibold">Justif - Portail</h1>
+              <h1 className="text-xl font-semibold">ML Consulting</h1>
               <p className="text-sm text-muted-foreground">
-                Documents classés par mois
+                Portail comptable - Documents classés par mois
               </p>
             </div>
           </div>
@@ -120,10 +120,15 @@ export default async function PortailPage({
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">{doc.title}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                             <Badge variant="outline" className="text-xs">
                               {doc.type === 'invoice' ? 'Facture' : 'Ticket'}
                             </Badge>
+                            {doc.type === 'invoice' && (
+                              <Badge className={`text-xs ${doc.category === 'client' ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : 'bg-blue-100 text-blue-700 hover:bg-blue-100'}`}>
+                                {doc.category === 'client' ? 'Client' : 'Fournisseur'}
+                              </Badge>
+                            )}
                             <span>{doc.file_name}</span>
                             <span>
                               {new Date(doc.created_at).toLocaleDateString('fr-FR')}

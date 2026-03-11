@@ -56,7 +56,7 @@ function LoginForm() {
             <FileText className="h-6 w-6 text-primary" />
           </div>
           <CardTitle className="text-2xl">Justif</CardTitle>
-          <CardDescription>Gestion des factures et tickets</CardDescription>
+          <CardDescription>ML Consulting - Gestion des factures et tickets</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
