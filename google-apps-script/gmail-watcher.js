@@ -101,6 +101,13 @@ function processNewInvoices() {
       // Analyser si c'est une facture
       var analysis = analyzeEmail(subject, body, sender, validAttachments);
 
+      // Si ce n'est pas une facture, ignorer et passer au suivant
+      if (!analysis.isInvoice) {
+        thread.addLabel(labelIgnored);
+        Logger.log('Ignoré (pas une facture): ' + subject + ' [' + analysis.matchedKeywords.join(', ') + ']');
+        continue;
+      }
+
       for (var a = 0; a < validAttachments.length; a++) {
         var attachment = validAttachments[a];
 
@@ -136,11 +143,7 @@ function processNewInvoices() {
 
           var code = response.getResponseCode();
           if (code === 200 || code === 201) {
-            if (analysis.isInvoice) {
-              thread.addLabel(labelProcessed);
-            } else {
-              thread.addLabel(labelDoubt);
-            }
+            thread.addLabel(labelProcessed);
           } else if (code === 409) {
             // Déjà traité (doublon)
             thread.addLabel(labelProcessed);

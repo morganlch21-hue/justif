@@ -56,11 +56,11 @@ export default async function PortailPage({
     .update({ last_used_at: new Date().toISOString() })
     .eq('id', validToken.id);
 
-  // Fetch all confirmed documents
+  // Fetch only confirmed documents (not to_verify or ignored)
   const { data: documents } = await supabase
     .from('accounting_documents')
     .select('*')
-    .neq('status', 'ignored')
+    .eq('status', 'confirmed')
     .order('created_at', { ascending: false });
 
   // Group by month
