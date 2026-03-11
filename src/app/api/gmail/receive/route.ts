@@ -13,6 +13,7 @@ interface GmailPayload {
   confidence: number;
   isInvoice: boolean;
   matchedKeywords: string[];
+  category?: 'client' | 'supplier';
 }
 
 export const dynamic = 'force-dynamic';
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
         file_type: payload.fileType,
         file_size_bytes: fileBuffer.length,
         month_key: monthKey,
-        category: 'supplier',
+        category: payload.category || 'supplier',
         status,
         gmail_message_id: payload.messageId,
         gmail_sender: payload.sender,

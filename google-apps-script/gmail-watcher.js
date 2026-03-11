@@ -26,20 +26,35 @@ function getConfig() {
     LABEL_PROCESSED: 'Compta/Traite',
     LABEL_DOUBT: 'Compta/Doute',
     LABEL_IGNORED: 'Compta/Ignore',
-    // Recherche : emails avec PJ, non traités, des 7 derniers jours
-    SEARCH_QUERY: 'has:attachment -label:Compta/Traite -label:Compta/Ignore -label:Compta/Doute newer_than:7d',
+    // Recherche : emails avec PJ, non traités, des 90 derniers jours
+    SEARCH_QUERY: 'has:attachment -label:Compta/Traite -label:Compta/Ignore -label:Compta/Doute newer_than:90d',
   };
 }
 
-// Mots-clés indiquant une facture
-var INVOICE_KEYWORDS = [
+// Mots-clés forts (très probablement une facture fournisseur)
+var STRONG_KEYWORDS = [
   'facture', 'invoice', 'reçu', 'receipt', 'avoir', 'credit note',
-  'note d\'honoraires', 'debit note', 'relevé', 'statement',
-  'commande', 'order confirmation', 'paiement', 'payment',
-  'abonnement', 'subscription', 'renouvellement', 'renewal',
-  'pro forma', 'proforma', 'bon de commande', 'purchase order',
-  'récapitulatif', 'summary', 'montant', 'amount due',
-  'échéance', 'due date', 'solde', 'balance',
+  'note d\'honoraires', 'debit note', 'pro forma', 'proforma',
+];
+
+// Mots-clés faibles (contexte facture, mais seuls = pas suffisant)
+var WEAK_KEYWORDS = [
+  'paiement', 'payment', 'abonnement', 'subscription',
+  'montant', 'amount due', 'échéance', 'due date',
+  'relevé', 'statement', 'solde', 'balance',
+];
+
+// Patterns de fichiers = facture sortante (à EXCLURE)
+var OUTGOING_INVOICE_PATTERNS = [
+  'ml-consulting', 'ml_consulting', '2603-f-',
+];
+
+// Sujets à ignorer (pas des factures)
+var IGNORED_SUBJECTS = [
+  'cni', 'carte d\'identité', 'passeport', 'autorisation',
+  'timesheet', 'feuille de temps', 'planning',
+  'cookiebot', 'newsletter', 'webinar', 'inscription',
+  'bienvenue', 'welcome', 'café tissé',
 ];
 
 // Extensions de fichiers acceptées
@@ -56,7 +71,7 @@ var IGNORED_PATTERNS = [
  */
 function processNewInvoices() {
   var config = getConfig();
-  var threads = GmailApp.search(config.SEARCH_QUERY, 0, 50);
+  var threads = GmailApp.search(config.SEARCH_QUERY, 0, 100);
 
   var labelProcessed = getOrCreateLabel(config.LABEL_PROCESSED);
   var labelDoubt = getOrCreateLabel(config.LABEL_DOUBT);
@@ -107,6 +122,7 @@ function processNewInvoices() {
           confidence: analysis.confidence,
           isInvoice: analysis.isInvoice,
           matchedKeywords: analysis.matchedKeywords,
+          category: analysis.category || 'supplier',
         };
 
         try {
@@ -144,32 +160,66 @@ function processNewInvoices() {
  */
 function analyzeEmail(subject, body, sender, attachments) {
   var text = (subject + ' ' + body + ' ' + sender).toLowerCase();
-  var matchedKeywords = [];
+  var subjectLower = subject.toLowerCase();
+  var strongMatches = [];
+  var weakMatches = [];
 
-  for (var i = 0; i < INVOICE_KEYWORDS.length; i++) {
-    if (text.indexOf(INVOICE_KEYWORDS[i].toLowerCase()) !== -1) {
-      matchedKeywords.push(INVOICE_KEYWORDS[i]);
+  // Vérifier si c'est un sujet à ignorer
+  for (var s = 0; s < IGNORED_SUBJECTS.length; s++) {
+    if (subjectLower.indexOf(IGNORED_SUBJECTS[s]) !== -1) {
+      return { isInvoice: false, confidence: 0, matchedKeywords: ['IGNORED:' + IGNORED_SUBJECTS[s]] };
     }
   }
 
-  // Vérifier les noms des PJ
+  // Vérifier si c'est une facture sortante (ML-CONSULTING) → catégorie "client"
   for (var a = 0; a < attachments.length; a++) {
-    var name = attachments[a].getName().toLowerCase();
-    for (var k = 0; k < INVOICE_KEYWORDS.length; k++) {
-      if (name.indexOf(INVOICE_KEYWORDS[k].toLowerCase()) !== -1) {
-        matchedKeywords.push('filename:' + INVOICE_KEYWORDS[k]);
+    var fileName = attachments[a].getName().toLowerCase();
+    for (var o = 0; o < OUTGOING_INVOICE_PATTERNS.length; o++) {
+      if (fileName.indexOf(OUTGOING_INVOICE_PATTERNS[o]) !== -1) {
+        return { isInvoice: true, confidence: 1, matchedKeywords: ['CLIENT:' + fileName], category: 'client' };
       }
     }
   }
 
-  // Score de confiance
-  var uniqueKeywords = matchedKeywords.filter(function(v, i, a) { return a.indexOf(v) === i; });
-  var confidence = Math.min(uniqueKeywords.length / 3, 1); // 0 à 1
+  // Chercher mots-clés forts
+  for (var i = 0; i < STRONG_KEYWORDS.length; i++) {
+    if (text.indexOf(STRONG_KEYWORDS[i].toLowerCase()) !== -1) {
+      strongMatches.push(STRONG_KEYWORDS[i]);
+    }
+  }
+
+  // Chercher mots-clés faibles
+  for (var w = 0; w < WEAK_KEYWORDS.length; w++) {
+    if (text.indexOf(WEAK_KEYWORDS[w].toLowerCase()) !== -1) {
+      weakMatches.push(WEAK_KEYWORDS[w]);
+    }
+  }
+
+  // Vérifier les noms des PJ pour mots-clés forts
+  for (var a2 = 0; a2 < attachments.length; a2++) {
+    var name = attachments[a2].getName().toLowerCase();
+    for (var k = 0; k < STRONG_KEYWORDS.length; k++) {
+      if (name.indexOf(STRONG_KEYWORDS[k].toLowerCase()) !== -1) {
+        strongMatches.push('filename:' + STRONG_KEYWORDS[k]);
+      }
+    }
+  }
+
+  var allMatches = strongMatches.concat(weakMatches);
+  var uniqueAll = allMatches.filter(function(v, i, a) { return a.indexOf(v) === i; });
+
+  // Logique : au moins 1 mot-clé fort OU 2+ mots-clés faibles
+  var hasStrong = strongMatches.length > 0;
+  var hasEnoughWeak = weakMatches.length >= 2;
+  var isInvoice = hasStrong || hasEnoughWeak;
+
+  var confidence = hasStrong ? Math.min(0.5 + (uniqueAll.length / 4), 1) : Math.min(weakMatches.length / 4, 0.6);
 
   return {
-    isInvoice: uniqueKeywords.length >= 1,
+    isInvoice: isInvoice,
     confidence: confidence,
-    matchedKeywords: uniqueKeywords,
+    matchedKeywords: uniqueAll,
+    category: 'supplier',
   };
 }
 

@@ -21,7 +21,11 @@ export default function DocumentsPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ month });
-      if (type !== 'all') params.set('type', type);
+      if (type === 'ticket') params.set('type', 'ticket');
+      else if (type === 'supplier' || type === 'client') {
+        params.set('type', 'invoice');
+        params.set('category', type);
+      }
       const res = await fetch(`/api/documents?${params}`);
       const data = await res.json();
       setDocuments(data.documents || []);
@@ -85,7 +89,8 @@ export default function DocumentsPage() {
           <Tabs value={type} onValueChange={setType}>
             <TabsList>
               <TabsTrigger value="all">Tout</TabsTrigger>
-              <TabsTrigger value="invoice">Factures</TabsTrigger>
+              <TabsTrigger value="supplier">Fournisseurs</TabsTrigger>
+              <TabsTrigger value="client">Clients</TabsTrigger>
               <TabsTrigger value="ticket">Tickets</TabsTrigger>
             </TabsList>
           </Tabs>

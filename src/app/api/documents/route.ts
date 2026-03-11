@@ -7,6 +7,7 @@ export async function GET(request: Request) {
     const monthKey = searchParams.get('month');
     const type = searchParams.get('type');
     const status = searchParams.get('status');
+    const category = searchParams.get('category');
 
     const supabase = createServiceClient();
     let query = supabase
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
     if (monthKey) query = query.eq('month_key', monthKey);
     if (type) query = query.eq('type', type);
     if (status) query = query.eq('status', status);
+    if (category) query = query.eq('category', category);
 
     const { data, error } = await query;
 

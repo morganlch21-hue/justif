@@ -39,6 +39,11 @@ export function DocumentCard({ document: doc, onPushToQonto, onDelete, onStatusC
             <Badge variant="outline" className="text-xs">
               {doc.type === 'invoice' ? 'Facture' : 'Ticket'}
             </Badge>
+            {doc.type === 'invoice' && (
+              <Badge className={`text-xs ${doc.category === 'client' ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : 'bg-blue-100 text-blue-700 hover:bg-blue-100'}`}>
+                {doc.category === 'client' ? 'Client' : 'Fournisseur'}
+              </Badge>
+            )}
             {doc.source === 'gmail' && (
               <Badge variant="outline" className="text-xs">Email</Badge>
             )}

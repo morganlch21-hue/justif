@@ -18,6 +18,8 @@ import { useRouter } from 'next/navigation';
 interface DashboardStats {
   totalDocs: number;
   invoices: number;
+  clientInvoices: number;
+  supplierInvoices: number;
   tickets: number;
   toVerify: number;
   sentToQonto: number;
@@ -51,6 +53,8 @@ export default function DashboardPage() {
       setStats({
         totalDocs: docs.length,
         invoices: docs.filter(d => d.type === 'invoice').length,
+        clientInvoices: docs.filter(d => d.type === 'invoice' && d.category === 'client').length,
+        supplierInvoices: docs.filter(d => d.type === 'invoice' && d.category !== 'client').length,
         tickets: docs.filter(d => d.type === 'ticket').length,
         toVerify: docs.filter(d => d.status === 'to_verify').length,
         sentToQonto: docs.filter(d => d.qonto_attachment_sent).length,
@@ -163,7 +167,7 @@ export default function DashboardPage() {
           </div>
         ) : stats && (
           <>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <Card>
                 <CardContent className="p-4 text-center">
                   <p className="text-2xl font-bold">{stats.totalDocs}</p>
@@ -172,8 +176,14 @@ export default function DashboardPage() {
               </Card>
               <Card>
                 <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold">{stats.invoices}</p>
-                  <p className="text-xs text-muted-foreground">Factures</p>
+                  <p className="text-2xl font-bold text-blue-600">{stats.supplierInvoices}</p>
+                  <p className="text-xs text-muted-foreground">Fournisseurs</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <p className="text-2xl font-bold text-purple-600">{stats.clientInvoices}</p>
+                  <p className="text-xs text-muted-foreground">Clients</p>
                 </CardContent>
               </Card>
               <Card>
