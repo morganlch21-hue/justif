@@ -18,14 +18,14 @@ export function MonthSelector({ value, onChange }: MonthSelectorProps) {
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+    <div className="flex items-center gap-1">
+      <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="h-8 w-8 rounded-full">
         <ChevronLeft className="h-4 w-4" />
       </Button>
-      <span className="min-w-[140px] text-center font-medium">
+      <span className="min-w-[130px] text-center text-sm font-semibold">
         {formatMonthKey(value)}
       </span>
-      <Button variant="ghost" size="icon" onClick={() => navigate(1)}>
+      <Button variant="ghost" size="icon" onClick={() => navigate(1)} className="h-8 w-8 rounded-full">
         <ChevronRight className="h-4 w-4" />
       </Button>
     </div>

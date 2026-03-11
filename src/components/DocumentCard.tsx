@@ -1,9 +1,8 @@
 'use client';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Image as ImageIcon, Check, AlertTriangle, Clock, Send, Trash2 } from 'lucide-react';
+import { FileText, Image as ImageIcon, Check, Send, Trash2, Eye } from 'lucide-react';
 import type { AccountingDocument } from '@/lib/types';
 
 interface DocumentCardProps {
@@ -11,16 +10,17 @@ interface DocumentCardProps {
   onPushToQonto?: (doc: AccountingDocument) => void;
   onDelete?: (id: string) => void;
   onStatusChange?: (id: string, status: string) => void;
+  onPreview?: (id: string) => void;
 }
 
-export function DocumentCard({ document: doc, onPushToQonto, onDelete, onStatusChange }: DocumentCardProps) {
+export function DocumentCard({ document: doc, onPushToQonto, onDelete, onStatusChange, onPreview }: DocumentCardProps) {
   const isImage = doc.file_type.startsWith('image/');
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="group transition-all duration-200 hover:apple-shadow-hover">
       <CardContent className="flex items-start gap-3 p-4">
         {/* Icon */}
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50">
           {isImage ? (
             <ImageIcon className="h-5 w-5 text-muted-foreground" />
           ) : (
@@ -31,49 +31,50 @@ export function DocumentCard({ document: doc, onPushToQonto, onDelete, onStatusC
         {/* Content */}
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <p className="truncate font-medium text-sm">{doc.title}</p>
-            <StatusBadge status={doc.status} />
+            <p className="truncate text-sm font-medium">{doc.title}</p>
+            <StatusDot status={doc.status} />
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-            <Badge variant="outline" className="text-xs">
-              {doc.type === 'invoice' ? 'Facture' : 'Ticket'}
-            </Badge>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {doc.type === 'invoice' ? 'Facture' : 'Ticket'}
             {doc.type === 'invoice' && (
-              <Badge className={`text-xs ${doc.category === 'client' ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : 'bg-blue-100 text-blue-700 hover:bg-blue-100'}`}>
-                {doc.category === 'client' ? 'Client' : 'Fournisseur'}
-              </Badge>
+              <> · {doc.category === 'client' ? 'Client' : 'Fournisseur'}</>
             )}
-            {doc.source === 'gmail' && (
-              <Badge variant="outline" className="text-xs">Email</Badge>
-            )}
-            <span>{new Date(doc.created_at).toLocaleDateString('fr-FR')}</span>
-            {doc.file_size_bytes && (
-              <span>{formatFileSize(doc.file_size_bytes)}</span>
-            )}
-          </div>
+            {doc.source === 'gmail' && <> · Email</>}
+            {' · '}
+            {new Date(doc.created_at).toLocaleDateString('fr-FR')}
+            {doc.file_size_bytes && <> · {formatFileSize(doc.file_size_bytes)}</>}
+          </p>
 
           {/* Qonto status */}
-          <div className="mt-2 flex items-center gap-2">
-            {doc.qonto_attachment_sent ? (
-              <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
-                <Check className="mr-1 h-3 w-3" />
-                Envoyé sur Qonto
-              </Badge>
-            ) : doc.qonto_error ? (
-              <Badge variant="destructive" className="text-xs">
-                <AlertTriangle className="mr-1 h-3 w-3" />
-                Erreur Qonto
-              </Badge>
-            ) : null}
-          </div>
+          {doc.qonto_attachment_sent ? (
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-green-600">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-green-500" />
+              Qonto
+            </p>
+          ) : doc.qonto_error ? (
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-red-500">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-red-500" />
+              Erreur Qonto
+            </p>
+          ) : null}
 
           {/* Actions */}
-          <div className="mt-2 flex items-center gap-1">
+          <div className="mt-2.5 flex items-center gap-1">
+            {onPreview && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground"
+                onClick={() => onPreview(doc.id)}
+              >
+                <Eye className="mr-1 h-3 w-3" />
+                Voir
+              </Button>
+            )}
             {doc.status === 'to_verify' && onStatusChange && (
               <>
                 <Button
-                  variant="outline"
                   size="sm"
                   className="h-7 text-xs"
                   onClick={() => onStatusChange(doc.id, 'confirmed')}
@@ -84,7 +85,7 @@ export function DocumentCard({ document: doc, onPushToQonto, onDelete, onStatusC
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs"
+                  className="h-7 text-xs text-muted-foreground"
                   onClick={() => onStatusChange(doc.id, 'ignored')}
                 >
                   Ignorer
@@ -93,20 +94,20 @@ export function DocumentCard({ document: doc, onPushToQonto, onDelete, onStatusC
             )}
             {!doc.qonto_attachment_sent && doc.status === 'confirmed' && onPushToQonto && (
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-7 text-xs"
+                className="h-7 text-xs text-muted-foreground"
                 onClick={() => onPushToQonto(doc)}
               >
                 <Send className="mr-1 h-3 w-3" />
-                Envoyer sur Qonto
+                Envoyer
               </Button>
             )}
             {onDelete && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs text-destructive hover:text-destructive"
+                className="ml-auto h-7 w-7 p-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
                 onClick={() => onDelete(doc.id)}
               >
                 <Trash2 className="h-3 w-3" />
@@ -119,19 +120,29 @@ export function DocumentCard({ document: doc, onPushToQonto, onDelete, onStatusC
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusDot({ status }: { status: string }) {
   switch (status) {
     case 'confirmed':
-      return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs">Confirmé</Badge>;
+      return (
+        <span className="flex items-center gap-1.5 text-xs text-green-600 shrink-0">
+          <span className="flex h-2 w-2 rounded-full bg-green-500" />
+          Confirmé
+        </span>
+      );
     case 'to_verify':
       return (
-        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs">
-          <Clock className="mr-1 h-3 w-3" />
+        <span className="flex items-center gap-1.5 text-xs text-amber-600 shrink-0">
+          <span className="flex h-2 w-2 animate-pulse rounded-full bg-amber-500" />
           À vérifier
-        </Badge>
+        </span>
       );
     case 'ignored':
-      return <Badge variant="secondary" className="text-xs">Ignoré</Badge>;
+      return (
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+          <span className="flex h-2 w-2 rounded-full bg-gray-300" />
+          Ignoré
+        </span>
+      );
     default:
       return null;
   }

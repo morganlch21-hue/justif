@@ -9,7 +9,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/portail') ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/api/gmail') ||
-    pathname.startsWith('/api/portail') ||
+    pathname.startsWith('/api/portail/download') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/icons') ||
     pathname === '/manifest.json' ||

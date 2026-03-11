@@ -66,7 +66,7 @@ export function TicketCapture() {
   if (success) {
     return (
       <div className="flex flex-col items-center gap-6 p-4">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-50">
           <Check className="h-10 w-10 text-green-600" />
         </div>
         <p className="text-lg font-medium text-green-700">Ticket enregistré !</p>
@@ -92,16 +92,16 @@ export function TicketCapture() {
       {!preview ? (
         <Button
           size="lg"
-          className="h-32 w-full max-w-sm text-lg"
+          className="h-36 w-full max-w-sm text-base rounded-2xl"
           onClick={() => fileInputRef.current?.click()}
         >
-          <Camera className="mr-3 h-8 w-8" />
+          <Camera className="mr-3 h-7 w-7" />
           Prendre une photo du ticket
         </Button>
       ) : (
         <Card className="w-full max-w-sm">
-          <CardContent className="space-y-4 pt-4">
-            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border">
+          <CardContent className="space-y-4 p-5">
+            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl">
               <Image
                 src={preview}
                 alt="Aperçu du ticket"
@@ -111,7 +111,7 @@ export function TicketCapture() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description (optionnel)</Label>
+              <Label htmlFor="description" className="text-xs text-muted-foreground">Description (optionnel)</Label>
               <Input
                 id="description"
                 placeholder="Ex: déjeuner client, repas équipe..."
@@ -147,17 +147,14 @@ export function TicketCapture() {
         </Card>
       )}
 
-      {/* Alternative: upload from gallery */}
       {!preview && (
         <Button
           variant="ghost"
-          className="text-muted-foreground"
+          className="text-sm text-muted-foreground"
           onClick={() => {
-            // Remove capture attribute to allow gallery selection
             if (fileInputRef.current) {
               fileInputRef.current.removeAttribute('capture');
               fileInputRef.current.click();
-              // Re-add capture for next use
               setTimeout(() => {
                 fileInputRef.current?.setAttribute('capture', 'environment');
               }, 100);

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { FileText, Lock } from 'lucide-react';
+import { FileText, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   return (
@@ -49,19 +49,21 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-muted/30">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <FileText className="h-6 w-6 text-primary" />
+    <div className="flex min-h-screen items-center justify-center p-4 bg-background">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center space-y-4 pb-2">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary">
+            <FileText className="h-6 w-6 text-white" />
           </div>
-          <CardTitle className="text-2xl">Justif</CardTitle>
-          <CardDescription>ML Consulting - Gestion des factures et tickets</CardDescription>
+          <div>
+            <CardTitle className="text-xl">Justif</CardTitle>
+            <CardDescription className="mt-1">Gestion des justificatifs</CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-xs text-muted-foreground">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -72,7 +74,7 @@ function LoginForm() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
+              <Label htmlFor="password" className="text-xs text-muted-foreground">Mot de passe</Label>
               <Input
                 id="password"
                 type="password"
@@ -82,7 +84,7 @@ function LoginForm() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              <Lock className="mr-2 h-4 w-4" />
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {loading ? 'Connexion...' : 'Se connecter'}
             </Button>
           </form>

@@ -14,8 +14,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Aucun fichier fourni' }, { status: 400 });
     }
 
+    // Validate file size (max 20MB)
+    const MAX_FILE_SIZE = 20 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: 'Fichier trop volumineux (max 20 Mo)' }, { status: 400 });
+    }
+
+    // Validate file type
+    const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: 'Type de fichier non autorisé (PDF, JPG, PNG uniquement)' }, { status: 400 });
+    }
+
     const supabase = createServiceClient();
-    const monthKey = getCurrentMonthKey();
+    const monthKey = (formData.get('month') as string) || getCurrentMonthKey();
     const docId = crypto.randomUUID();
     const bucket = type === 'invoice' ? 'accounting-invoices' : 'accounting-tickets';
     const storagePath = `${monthKey}/${docId}/${file.name}`;

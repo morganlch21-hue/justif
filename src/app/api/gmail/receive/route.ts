@@ -27,6 +27,18 @@ export async function POST(request: Request) {
     }
 
     const payload: GmailPayload = await request.json();
+
+    // Validate payload size (base64 file max ~20MB)
+    if (payload.fileBase64 && payload.fileBase64.length > 28 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Fichier trop volumineux' }, { status: 400 });
+    }
+
+    // Validate file type
+    const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (payload.fileType && !ALLOWED_TYPES.includes(payload.fileType)) {
+      return NextResponse.json({ error: 'Type de fichier non autorisé' }, { status: 400 });
+    }
+
     const supabase = createServiceClient();
 
     // Check for duplicates

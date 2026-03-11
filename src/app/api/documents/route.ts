@@ -54,6 +54,28 @@ export async function PATCH(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  try {
+    const { ids, status } = await request.json();
+    if (!ids || !Array.isArray(ids) || !status) {
+      return NextResponse.json({ error: 'ids (array) et status requis' }, { status: 400 });
+    }
+
+    const supabase = createServiceClient();
+    const { error } = await supabase
+      .from('accounting_documents')
+      .update({ status })
+      .in('id', ids);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ success: true, updated: ids.length });
+  } catch {
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);

@@ -2,18 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { MonthSelector } from '@/components/MonthSelector';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
-  FileText, Camera, FolderOpen, AlertTriangle,
-  CheckCircle, Clock, Receipt, RefreshCw, Loader2, LogOut
+  FileText, Camera, FolderOpen,
+  CheckCircle, Clock, Receipt, RefreshCw, Loader2
 } from 'lucide-react';
 import { getCurrentMonthKey, type AccountingDocument, type QontoTransaction } from '@/lib/types';
-import { createBrowserClient } from '@/lib/supabase';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 interface DashboardStats {
   totalDocs: number;
@@ -31,7 +30,6 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const router = useRouter();
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -40,7 +38,6 @@ export default function DashboardPage() {
       const { documents } = await res.json() as { documents: AccountingDocument[] };
       const docs = documents || [];
 
-      // Fetch Qonto missing invoices
       let missing: QontoTransaction[] = [];
       try {
         const qRes = await fetch(`/api/qonto/missing?month=${month}`);
@@ -74,9 +71,7 @@ export default function DashboardPage() {
   async function autoPushQonto() {
     setSyncing(true);
     try {
-      // First sync transactions
       await fetch(`/api/qonto/sync?month=${month}`, { method: 'POST' });
-      // Then auto-push confirmed docs
       const res = await fetch(`/api/qonto/auto-push?month=${month}`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
@@ -96,39 +91,28 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleLogout() {
-    const supabase = createBrowserClient();
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  }
-
   return (
-    <div className="min-h-screen bg-muted/30">
-      <header className="border-b bg-background px-4 py-3">
-        <div className="mx-auto flex max-w-4xl items-center justify-between">
+    <div className="min-h-screen bg-background">
+      <header className="px-4 py-4">
+        <div className="mx-auto flex max-w-4xl items-center">
           <div className="flex items-center gap-3">
-            <FileText className="h-6 w-6 text-primary" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
+              <FileText className="h-5 w-5 text-white" />
+            </div>
             <div>
-              <h1 className="text-xl font-semibold">Justif</h1>
+              <h1 className="text-lg font-semibold tracking-tight">Justif</h1>
               <p className="text-xs text-muted-foreground">ML Consulting</p>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="mr-1 h-4 w-4" />
-              Déconnexion
-            </Button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-6 p-4 py-6">
+      <main className="mx-auto max-w-4xl space-y-6 px-4 pb-24 animate-fade-in">
         {/* Month selector */}
         <div className="flex items-center justify-between">
           <MonthSelector value={month} onChange={setMonth} />
           <Button variant="outline" size="sm" onClick={autoPushQonto} disabled={syncing}>
-            {syncing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}
+            {syncing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
             Sync Qonto
           </Button>
         </div>
@@ -136,35 +120,37 @@ export default function DashboardPage() {
         {/* Quick actions */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Link href="/ticket">
-            <Card className="cursor-pointer transition-colors hover:bg-accent">
-              <CardContent className="flex flex-col items-center gap-2 p-4">
-                <Camera className="h-8 w-8 text-primary" />
+            <Card className="cursor-pointer transition-all duration-200 hover:apple-shadow-hover hover:scale-[1.02]">
+              <CardContent className="flex flex-col items-center gap-2.5 p-5">
+                <Camera className="h-7 w-7 text-primary" />
                 <span className="text-sm font-medium">Ticket resto</span>
               </CardContent>
             </Card>
           </Link>
           <Link href="/documents">
-            <Card className="cursor-pointer transition-colors hover:bg-accent">
-              <CardContent className="flex flex-col items-center gap-2 p-4">
-                <FolderOpen className="h-8 w-8 text-primary" />
+            <Card className="cursor-pointer transition-all duration-200 hover:apple-shadow-hover hover:scale-[1.02]">
+              <CardContent className="flex flex-col items-center gap-2.5 p-5">
+                <FolderOpen className="h-7 w-7 text-primary" />
                 <span className="text-sm font-medium">Documents</span>
               </CardContent>
             </Card>
           </Link>
           <Link href="/documents">
-            <Card className="cursor-pointer transition-colors hover:bg-accent">
-              <CardContent className="flex flex-col items-center gap-2 p-4 relative">
-                <Clock className="h-8 w-8 text-amber-500" />
+            <Card className="cursor-pointer transition-all duration-200 hover:apple-shadow-hover hover:scale-[1.02]">
+              <CardContent className="flex flex-col items-center gap-2.5 p-5 relative">
+                <Clock className="h-7 w-7 text-amber-500" />
                 <span className="text-sm font-medium">À vérifier</span>
                 {stats && stats.toVerify > 0 && (
-                  <Badge className="absolute -right-1 -top-1 bg-amber-500">{stats.toVerify}</Badge>
+                  <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-semibold text-white">
+                    {stats.toVerify}
+                  </span>
                 )}
               </CardContent>
             </Card>
           </Link>
-          <Card className="cursor-pointer transition-colors hover:bg-accent" onClick={autoPushQonto}>
-            <CardContent className="flex flex-col items-center gap-2 p-4">
-              <Receipt className="h-8 w-8 text-primary" />
+          <Card className="cursor-pointer transition-all duration-200 hover:apple-shadow-hover hover:scale-[1.02]" onClick={autoPushQonto}>
+            <CardContent className="flex flex-col items-center gap-2.5 p-5">
+              <Receipt className="h-7 w-7 text-primary" />
               <span className="text-sm font-medium">Sync Qonto</span>
             </CardContent>
           </Card>
@@ -172,86 +158,87 @@ export default function DashboardPage() {
 
         {/* Stats */}
         {loading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              <div className="grid grid-cols-2 sm:grid-cols-5">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className={cn("p-5 text-center", i > 0 && "border-l")}>
+                    <Skeleton className="mx-auto h-8 w-12 rounded-lg" />
+                    <Skeleton className="mx-auto mt-2 h-3 w-16 rounded" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         ) : stats && (
           <>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold">{stats.totalDocs}</p>
-                  <p className="text-xs text-muted-foreground">Documents</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-blue-600">{stats.supplierInvoices}</p>
-                  <p className="text-xs text-muted-foreground">Fournisseurs</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-purple-600">{stats.clientInvoices}</p>
-                  <p className="text-xs text-muted-foreground">Clients</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold">{stats.tickets}</p>
-                  <p className="text-xs text-muted-foreground">Tickets</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-green-600">{stats.sentToQonto}</p>
-                  <p className="text-xs text-muted-foreground">Envoyés Qonto</p>
-                </CardContent>
-              </Card>
-            </div>
+            <Card>
+              <CardContent className="p-0">
+                <div className="grid grid-cols-2 sm:grid-cols-5">
+                  <div className="p-5 text-center">
+                    <p className="text-3xl font-semibold tracking-tight">{stats.totalDocs}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Documents</p>
+                  </div>
+                  <div className="border-l p-5 text-center">
+                    <p className="text-3xl font-semibold tracking-tight">{stats.supplierInvoices}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Fournisseurs</p>
+                  </div>
+                  <div className="border-l p-5 text-center">
+                    <p className="text-3xl font-semibold tracking-tight">{stats.clientInvoices}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Clients</p>
+                  </div>
+                  <div className="border-l p-5 text-center">
+                    <p className="text-3xl font-semibold tracking-tight">{stats.tickets}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Tickets</p>
+                  </div>
+                  <div className="border-l p-5 text-center">
+                    <p className="text-3xl font-semibold tracking-tight">{stats.sentToQonto}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Envoyés Qonto</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Missing invoices alert */}
             {stats.missingInvoices.length > 0 && (
-              <Card className="border-amber-200 bg-amber-50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base text-amber-800">
-                    <AlertTriangle className="h-5 w-5" />
+              <div className="rounded-xl bg-amber-50 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="flex h-2 w-2 rounded-full bg-amber-500" />
+                  <p className="text-sm font-medium text-amber-900">
                     {stats.missingInvoices.length} paiement(s) sans facture
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="mb-3 text-sm text-amber-700">
-                    Ces transactions Qonto n&apos;ont pas de justificatif. Pensez à télécharger les factures depuis les plateformes concernées.
                   </p>
-                  <div className="space-y-2">
-                    {stats.missingInvoices.slice(0, 5).map((tx) => (
-                      <div key={tx.id} className="flex items-center justify-between rounded-lg bg-white/80 p-2 text-sm">
-                        <div>
-                          <span className="font-medium">{tx.counterparty_name || 'Inconnu'}</span>
-                          <span className="ml-2 text-muted-foreground">
-                            {new Date(tx.settled_at).toLocaleDateString('fr-FR')}
-                          </span>
-                        </div>
-                        <span className="font-medium text-amber-800">
-                          {(tx.amount_cents / 100).toFixed(2)} {tx.currency}
+                </div>
+                <p className="mb-3 text-sm text-amber-700/80">
+                  Pensez à télécharger les factures depuis les plateformes concernées.
+                </p>
+                <div className="space-y-1.5">
+                  {stats.missingInvoices.slice(0, 5).map((tx) => (
+                    <div key={tx.id} className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-sm">
+                      <div>
+                        <span className="font-medium">{tx.counterparty_name || 'Inconnu'}</span>
+                        <span className="ml-2 text-muted-foreground">
+                          {new Date(tx.settled_at).toLocaleDateString('fr-FR')}
                         </span>
                       </div>
-                    ))}
-                    {stats.missingInvoices.length > 5 && (
-                      <p className="text-xs text-amber-600">
-                        + {stats.missingInvoices.length - 5} autre(s)...
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                      <span className="font-medium tabular-nums text-amber-800">
+                        {(tx.amount_cents / 100).toFixed(2)} {tx.currency}
+                      </span>
+                    </div>
+                  ))}
+                  {stats.missingInvoices.length > 5 && (
+                    <p className="text-xs text-amber-600 pl-3">
+                      + {stats.missingInvoices.length - 5} autre(s)
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
 
             {stats.totalDocs === 0 && stats.missingInvoices.length === 0 && (
               <Card>
-                <CardContent className="py-12 text-center">
-                  <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
-                  <p className="mt-3 text-muted-foreground">
+                <CardContent className="py-16 text-center">
+                  <CheckCircle className="mx-auto h-12 w-12 text-green-500/40" />
+                  <p className="mt-3 text-sm text-muted-foreground">
                     Aucun document ce mois-ci. Les factures reçues par email apparaîtront automatiquement.
                   </p>
                 </CardContent>

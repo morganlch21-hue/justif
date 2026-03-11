@@ -13,9 +13,10 @@ export interface QontoTransactionAPI {
   amount_cents: number;
   currency: string;
   label: string | null;
+  clean_counterparty_name: string | null;
   settled_at: string;
   side: 'debit' | 'credit';
-  counterparty: string;
+  operation_type: string;
   attachment_ids: string[];
 }
 
@@ -81,11 +82,12 @@ export async function uploadAttachment(
 
 /**
  * Try to match a document to a Qonto transaction.
- * Extracts keywords from sender/subject/title and compares to transaction labels.
- * Returns the best matching transaction ID or null.
+ * Uses keyword matching between doc metadata and transaction labels/counterparty,
+ * plus amount comparison when available.
+ * Returns the best matching transaction or null.
  */
 export function findMatchingTransaction(
-  doc: { gmail_sender?: string; gmail_subject?: string; title?: string; created_at: string },
+  doc: { gmail_sender?: string; gmail_subject?: string; title?: string; created_at: string; amount_cents?: number | null },
   transactions: QontoTransactionAPI[]
 ): QontoTransactionAPI | null {
   // Only match debit transactions without attachments
@@ -103,7 +105,7 @@ export function findMatchingTransaction(
   ].join(' ').toLowerCase();
 
   // Extract meaningful words (skip common/short words)
-  const skipWords = new Set(['facture', 'invoice', 'votre', 'your', 'pour', 'from', 'the', 'les', 'des', 'une', 'fwd', 'com', 'gmail', 'email', 'noreply', 'billing', 'no-reply', 'info', 'contact', 'hello', 'bonjour']);
+  const skipWords = new Set(['facture', 'invoice', 'votre', 'your', 'pour', 'from', 'the', 'les', 'des', 'une', 'fwd', 'com', 'gmail', 'email', 'noreply', 'billing', 'no-reply', 'info', 'contact', 'hello', 'bonjour', 'merci', 'order', 'commande', 'confirmation', 'receipt', 'recu', 'numero', 'number']);
   const docWords = docText
     .replace(/[<>@.,;:!?()[\]{}""''#€$%&*+=/\\|~`^]/g, ' ')
     .split(/\s+/)
@@ -113,25 +115,35 @@ export function findMatchingTransaction(
   let bestScore = 0;
 
   for (const tx of candidates) {
-    const txLabel = (tx.label || '').toLowerCase().replace(/[*_\-]/g, ' ');
-    const txWords = txLabel.split(/\s+/).filter(w => w.length >= 3);
+    // Combine label and counterparty name for matching
+    const txText = [tx.label || '', tx.clean_counterparty_name || ''].join(' ').toLowerCase().replace(/[*_\-]/g, ' ');
+    const txWords = txText.split(/\s+/).filter(w => w.length >= 3);
 
-    // Score: how many doc words appear in the transaction label (or vice versa)
     let score = 0;
+
+    // Keyword matching: doc words in tx text
     for (const dw of docWords) {
-      if (txLabel.includes(dw)) score += 2;
+      if (txText.includes(dw)) score += 2;
     }
+    // Keyword matching: tx words in doc text
     for (const tw of txWords) {
       if (docText.includes(tw)) score += 2;
     }
 
-    // Date proximity bonus: closer dates score higher
+    // Amount matching: strong signal if amounts match exactly
+    if (doc.amount_cents && doc.amount_cents > 0 && tx.amount_cents === doc.amount_cents) {
+      score += 5;
+    }
+
+    // Date proximity bonus
     const docDate = new Date(doc.created_at).getTime();
     const txDate = new Date(tx.settled_at).getTime();
     const daysDiff = Math.abs(docDate - txDate) / (1000 * 60 * 60 * 24);
     if (daysDiff <= 3) score += 1;
+    if (daysDiff <= 7) score += 1;
 
-    if (score > bestScore && score >= 4) {
+    // Minimum threshold: at least 2 keyword matches (score 4) or amount match + 1 keyword
+    if (score > bestScore && score >= 3) {
       bestScore = score;
       bestMatch = tx;
     }

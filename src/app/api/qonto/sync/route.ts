@@ -42,7 +42,7 @@ export async function POST(request: Request) {
           amount_cents: tx.amount_cents,
           currency: tx.currency,
           label: tx.label,
-          counterparty_name: tx.counterparty,
+          counterparty_name: tx.clean_counterparty_name || tx.label || null,
           settled_at: tx.settled_at,
           side: tx.side,
           has_attachment: hasAttachment || !!matchedDoc,
