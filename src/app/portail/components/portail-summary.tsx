@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { PortailSummary as SummaryType } from '@/lib/types';
 
 interface Props {
-  token: string;
+  token?: string;
   month: string;
 }
 
@@ -21,7 +21,7 @@ export function PortailSummary({ token, month }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/portail/summary?month=${month}&token=${token}`)
+    fetch(`/api/portail/summary?month=${month}${token ? `&token=${token}` : ''}`)
       .then(r => r.json())
       .then(data => setSummary(data.summary))
       .catch(() => setSummary(null))

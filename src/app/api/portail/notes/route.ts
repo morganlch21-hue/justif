@@ -1,20 +1,16 @@
 import { createServiceClient } from '@/lib/supabase';
-import { validatePortailToken } from '@/lib/portail-auth';
+import { validatePortailAccess } from '@/lib/portail-auth';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const token = searchParams.get('token');
-
-    if (!token) {
-      return NextResponse.json({ error: 'Token manquant' }, { status: 400 });
-    }
-
-    const { valid, tokenId } = await validatePortailToken(token);
-    if (!valid || !tokenId) {
+    const { valid, tokenId, email } = await validatePortailAccess(request);
+    if (!valid) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
     }
+
+    // For session-based auth, use email as token_id fallback
+    const authorId = tokenId || email || 'unknown';
 
     const { document_id, note, flag } = await request.json();
 
@@ -42,7 +38,7 @@ export async function POST(request: Request) {
       .upsert(
         {
           document_id,
-          token_id: tokenId,
+          token_id: authorId,
           note: note || '',
           flag: flag || null,
           updated_at: new Date().toISOString(),

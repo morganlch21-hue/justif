@@ -7,7 +7,7 @@ import { X, Check, AlertTriangle, Copy, HelpCircle } from 'lucide-react';
 import type { AccountingDocument } from '@/lib/types';
 
 interface Props {
-  token: string;
+  token?: string;
   document: AccountingDocument;
   existingNote?: { note: string; flag: string | null };
   onClose: () => void;
@@ -29,7 +29,7 @@ export function PortailNoteDialog({ token, document: doc, existingNote, onClose,
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetch(`/api/portail/notes?token=${token}`, {
+      await fetch(`/api/portail/notes${token ? `?token=${token}` : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ document_id: doc.id, note, flag }),

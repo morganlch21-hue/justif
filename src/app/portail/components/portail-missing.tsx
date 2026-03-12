@@ -7,7 +7,7 @@ import { AlertTriangle, CheckCircle } from 'lucide-react';
 import type { QontoTransaction } from '@/lib/types';
 
 interface Props {
-  token: string;
+  token?: string;
   month: string;
   onCountChange: (count: number) => void;
 }
@@ -22,7 +22,7 @@ export function PortailMissing({ token, month, onCountChange }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/portail/missing?month=${month}&token=${token}`)
+    fetch(`/api/portail/missing?month=${month}${token ? `&token=${token}` : ''}`)
       .then(r => r.json())
       .then(data => {
         const txs = data.transactions || [];

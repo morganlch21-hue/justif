@@ -22,7 +22,7 @@ interface Transaction {
 }
 
 interface Props {
-  token: string;
+  token?: string;
   month: string;
 }
 
@@ -75,7 +75,7 @@ export function PortailReconciliation({ token, month }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/portail/reconciliation?month=${month}&token=${token}`)
+    fetch(`/api/portail/reconciliation?month=${month}${token ? `&token=${token}` : ''}`)
       .then(r => r.json())
       .then(data => {
         setMatched(data.matched || []);
@@ -110,7 +110,7 @@ export function PortailReconciliation({ token, month }: Props) {
                 </p>
               </div>
               {tx.matched_document && (
-                <a href={`/api/portail/download?id=${tx.matched_document.id}&token=${token}`}>
+                <a href={`/api/portail/download?id=${tx.matched_document.id}${token ? `&token=${token}` : ''}`}>
                   <Button variant="ghost" size="sm" className="text-xs text-primary shrink-0">
                     <Download className="mr-1 h-3 w-3" />
                     {tx.matched_document.title.slice(0, 20)}

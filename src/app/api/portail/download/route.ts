@@ -1,31 +1,22 @@
 import { createServiceClient } from '@/lib/supabase';
-import { createHash } from 'crypto';
+import { validatePortailAccess } from '@/lib/portail-auth';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const token = searchParams.get('token');
 
-    if (!id || !token) {
+    if (!id) {
       return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
     }
 
-    const supabase = createServiceClient();
-
-    // Validate token
-    const tokenHash = createHash('sha256').update(token).digest('hex');
-    const { data: validToken } = await supabase
-      .from('accounting_portail_tokens')
-      .select('id')
-      .eq('token_hash', tokenHash)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (!validToken) {
+    const { valid } = await validatePortailAccess(request);
+    if (!valid) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
     }
+
+    const supabase = createServiceClient();
 
     // Get document
     const { data: doc } = await supabase

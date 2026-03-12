@@ -1,22 +1,30 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, LogOut } from 'lucide-react';
 import { MonthSelector } from '@/components/MonthSelector';
 import { getCurrentMonthKey } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { createBrowserClient } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 import { PortailSummary } from './components/portail-summary';
 import { PortailDocuments } from './components/portail-documents';
 import { PortailReconciliation } from './components/portail-reconciliation';
 import { PortailMissing } from './components/portail-missing';
 
 interface Props {
-  token: string;
+  token?: string;
 }
 
 export function PortailDashboard({ token }: Props) {
   const [month, setMonth] = useState(getCurrentMonthKey());
   const [missingCount, setMissingCount] = useState(0);
+  const router = useRouter();
+  const isSessionMode = !token;
+
+  // Build query string for API calls
+  const authQuery = token ? `token=${token}` : '';
 
   // Sync Qonto in background on load, then fetch missing count
   useEffect(() => {
@@ -25,17 +33,24 @@ export function PortailDashboard({ token }: Props) {
         await fetch(`/api/qonto/sync?month=${month}`, { method: 'POST' });
       } catch { /* ignore sync errors */ }
       try {
-        const r = await fetch(`/api/portail/missing?month=${month}&token=${token}`);
+        const r = await fetch(`/api/portail/missing?month=${month}&${authQuery}`);
         const data = await r.json();
         setMissingCount((data.transactions || []).length);
       } catch { setMissingCount(0); }
     };
     syncThenFetchMissing();
-  }, [month, token]);
+  }, [month, authQuery]);
 
   const handleMissingCount = useCallback((count: number) => {
     setMissingCount(count);
   }, []);
+
+  async function handleLogout() {
+    const supabase = createBrowserClient();
+    await supabase.auth.signOut();
+    router.push('/portail/login');
+    router.refresh();
+  }
 
   return (
     <div className="min-h-screen bg-background animate-fade-in">
@@ -51,7 +66,14 @@ export function PortailDashboard({ token }: Props) {
                 <p className="text-xs text-muted-foreground">Portail comptable</p>
               </div>
             </div>
-            <MonthSelector value={month} onChange={setMonth} />
+            <div className="flex items-center gap-2">
+              <MonthSelector value={month} onChange={setMonth} />
+              {isSessionMode && (
+                <Button variant="ghost" size="icon" onClick={handleLogout} title="Déconnexion">
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </header>

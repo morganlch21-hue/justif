@@ -11,7 +11,7 @@ import type { AccountingDocument } from '@/lib/types';
 import { PortailNoteDialog } from './portail-note-dialog';
 
 interface Props {
-  token: string;
+  token?: string;
   month: string;
 }
 
@@ -32,7 +32,7 @@ export function PortailDocuments({ token, month }: Props) {
 
   const fetchDocs = () => {
     setLoading(true);
-    fetch(`/api/portail/documents?month=${month}&token=${token}`)
+    fetch(`/api/portail/documents?month=${month}${token ? `&token=${token}` : ''}`)
       .then(r => r.json())
       .then(data => {
         setDocuments(data.documents || []);
@@ -87,7 +87,7 @@ export function PortailDocuments({ token, month }: Props) {
             className="pl-9"
           />
         </div>
-        <a href={`/api/portail/download-month?month=${month}&token=${token}`}>
+        <a href={`/api/portail/download-month?month=${month}${token ? `&token=${token}` : ''}`}>
           <Button variant="outline" size="sm">
             <Download className="mr-1.5 h-3.5 w-3.5" />
             ZIP
@@ -154,12 +154,12 @@ export function PortailDocuments({ token, month }: Props) {
                     >
                       <MessageSquare className={`h-4 w-4 ${note ? 'fill-current' : ''}`} />
                     </Button>
-                    <a href={`/api/portail/download?id=${doc.id}&token=${token}&inline=1`} target="_blank" rel="noopener noreferrer">
+                    <a href={`/api/portail/download?id=${doc.id}${token ? `&token=${token}` : ''}&inline=1`} target="_blank" rel="noopener noreferrer">
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
                         <Eye className="h-4 w-4" />
                       </Button>
                     </a>
-                    <a href={`/api/portail/download?id=${doc.id}&token=${token}`}>
+                    <a href={`/api/portail/download?id=${doc.id}${token ? `&token=${token}` : ''}`}>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
                         <Download className="h-4 w-4" />
                       </Button>

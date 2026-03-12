@@ -1,20 +1,19 @@
 import { createServiceClient } from '@/lib/supabase';
-import { validatePortailToken } from '@/lib/portail-auth';
+import { validatePortailAccess } from '@/lib/portail-auth';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month');
-    const token = searchParams.get('token');
     const type = searchParams.get('type');
     const category = searchParams.get('category');
 
-    if (!month || !token) {
+    if (!month) {
       return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
     }
 
-    const { valid } = await validatePortailToken(token);
+    const { valid } = await validatePortailAccess(request);
     if (!valid) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
     }
