@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase';
 import { getCurrentMonthKey } from '@/lib/types';
 import { listTransactions, getMonthRange, uploadAttachment, findMatchingTransaction } from '@/lib/qonto';
+import { extractDocumentData } from '@/lib/claude-extract';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
@@ -80,6 +81,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erreur base de données' }, { status: 500 });
     }
 
+    // AI extraction: extract amount, vendor, date from document content
+    let extractedData = null;
+    try {
+      extractedData = await extractDocumentData(buffer, file.type);
+      if (extractedData) {
+        const updateFields: Record<string, unknown> = {
+          extraction_status: 'success',
+          extracted_vendor: extractedData.vendor,
+          extracted_date: extractedData.document_date,
+        };
+        // Only fill amount/description if user didn't provide them
+        if (!amountCents && extractedData.amount_cents) {
+          updateFields.amount_cents = extractedData.amount_cents;
+        }
+        if (!description && extractedData.description) {
+          updateFields.description = extractedData.description;
+          updateFields.title = extractedData.description;
+        }
+        await supabase
+          .from('accounting_documents')
+          .update(updateFields)
+          .eq('id', docId);
+        // Update local data object for matching
+        Object.assign(data, updateFields);
+      } else {
+        await supabase
+          .from('accounting_documents')
+          .update({ extraction_status: 'failed' })
+          .eq('id', docId);
+      }
+    } catch {
+      console.error('Extraction error (non-blocking)');
+      await supabase
+        .from('accounting_documents')
+        .update({ extraction_status: 'failed' })
+        .eq('id', docId);
+    }
+
     // Auto-push to Qonto: try to match and attach to a transaction
     let qontoPushed = false;
     if (category !== 'client') {
@@ -94,7 +133,7 @@ export async function POST(request: Request) {
         });
         const transactions = response.transactions || [];
         const matchedTx = findMatchingTransaction(
-          { ...data, type, category },
+          { ...data, type, category, extracted_vendor: extractedData?.vendor, extracted_date: extractedData?.document_date },
           transactions
         );
 

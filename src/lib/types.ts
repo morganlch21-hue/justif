@@ -24,6 +24,9 @@ export interface AccountingDocument {
   qonto_attachment_sent: boolean;
   qonto_attachment_sent_at: string | null;
   qonto_error: string | null;
+  extracted_vendor: string | null;
+  extracted_date: string | null;
+  extraction_status: 'success' | 'failed' | 'timeout' | null;
   status: 'confirmed' | 'to_verify' | 'ignored';
   created_at: string;
   updated_at: string;

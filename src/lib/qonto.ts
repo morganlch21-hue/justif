@@ -87,7 +87,7 @@ export async function uploadAttachment(
  * Returns the best matching transaction or null.
  */
 export function findMatchingTransaction(
-  doc: { gmail_sender?: string; gmail_subject?: string; title?: string; created_at: string; amount_cents?: number | null; type?: string; category?: string },
+  doc: { gmail_sender?: string; gmail_subject?: string; title?: string; created_at: string; amount_cents?: number | null; type?: string; category?: string; extracted_vendor?: string | null; extracted_date?: string | null },
   transactions: QontoTransactionAPI[]
 ): QontoTransactionAPI | null {
   // Only match debit transactions without attachments
@@ -104,6 +104,7 @@ export function findMatchingTransaction(
     doc.gmail_sender || '',
     doc.gmail_subject || '',
     doc.title || '',
+    doc.extracted_vendor || '',
   ].join(' ').toLowerCase();
 
   // Extract meaningful words (skip common/short words)
@@ -132,13 +133,22 @@ export function findMatchingTransaction(
       if (docText.includes(tw)) score += 2;
     }
 
+    // Direct vendor-to-counterparty match: very strong signal
+    if (doc.extracted_vendor) {
+      const vendorLower = doc.extracted_vendor.toLowerCase();
+      const counterparty = (tx.clean_counterparty_name || '').toLowerCase();
+      if (counterparty && vendorLower && (counterparty.includes(vendorLower) || vendorLower.includes(counterparty))) {
+        score += 4;
+      }
+    }
+
     // Amount matching: strong signal if amounts match exactly
     if (doc.amount_cents && doc.amount_cents > 0 && tx.amount_cents === doc.amount_cents) {
       score += 5;
     }
 
-    // Date proximity bonus
-    const docDate = new Date(doc.created_at).getTime();
+    // Date proximity bonus (prefer extracted document date over upload date)
+    const docDate = new Date(doc.extracted_date || doc.created_at).getTime();
     const txDate = new Date(tx.settled_at).getTime();
     const daysDiff = Math.abs(docDate - txDate) / (1000 * 60 * 60 * 24);
     if (daysDiff <= 1) score += 3;
