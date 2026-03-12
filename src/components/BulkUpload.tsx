@@ -6,7 +6,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Upload, X, Loader2, CheckCircle2, AlertCircle, FileText, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { createBrowserClient } from '@/lib/supabase';
 
 type FileStatus = 'pending' | 'uploading' | 'success' | 'error';
 
@@ -99,37 +98,18 @@ export function BulkUpload({ month, onComplete }: BulkUploadProps) {
     let successCount = 0;
     let errorCount = 0;
 
-    const supabase = createBrowserClient();
-
     for (let i = 0; i < files.length; i++) {
       setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'uploading' } : f));
 
       const file = files[i].file;
-      const sanitizedName = file.name.replace(/[#%?&=+]/g, '_');
-      const docId = crypto.randomUUID();
-      const bucket = docType === 'invoice' ? 'accounting-invoices' : 'accounting-tickets';
-      const storagePath = `${month}/${docId}/${sanitizedName}`;
 
       try {
-        // Step 1: Upload directly to Supabase Storage (bypasses Vercel WAF)
-        const { error: uploadError } = await supabase.storage
-          .from(bucket)
-          .upload(storagePath, file, {
-            contentType: file.type,
-            upsert: false,
-          });
-
-        if (uploadError) {
-          throw new Error(`Storage: ${uploadError.message}`);
-        }
-
-        // Step 2: Register document in DB via lightweight API (no file in body)
-        const res = await fetch('/api/documents/register', {
+        // Step 1: Get signed upload URL from server (lightweight, no file data)
+        const urlRes = await fetch('/api/documents/upload-url', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            storagePath,
-            fileName: sanitizedName,
+            fileName: file.name,
             fileType: file.type,
             fileSize: file.size,
             type: docType,
@@ -138,36 +118,39 @@ export function BulkUpload({ month, onComplete }: BulkUploadProps) {
           }),
         });
 
-        let data;
-        try {
-          data = await res.json();
-        } catch {
-          errorCount++;
-          toast.error(`Erreur pour ${file.name}: Erreur serveur (${res.status})`);
-          setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error' } : f));
-          continue;
+        if (!urlRes.ok) {
+          const errData = await urlRes.json().catch(() => ({}));
+          throw new Error(errData.error || `Erreur ${urlRes.status}`);
         }
 
-        if (res.ok) {
-          successCount++;
-          setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'success' } : f));
+        const { uploadUrl, document: doc } = await urlRes.json();
 
-          // Fire-and-forget: AI extraction + Qonto matching in background
-          if (data.document?.id) {
-            fetch(`/api/documents/process?id=${data.document.id}`, { method: 'POST' })
-              .then(r => r.json())
-              .then(result => {
-                if (result.qontoPushed) {
-                  toast.success(`${file.name} → Qonto ✓`);
-                }
-              })
-              .catch(() => {});
-          }
-        } else {
-          errorCount++;
-          const errMsg = data?.error || `Erreur ${res.status}`;
-          toast.error(`Erreur pour ${file.name}: ${errMsg}`);
-          setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error' } : f));
+        // Step 2: Upload file directly to Supabase Storage via signed URL (bypasses Vercel WAF)
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type,
+          },
+          body: file,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error(`Upload storage: ${uploadRes.status}`);
+        }
+
+        successCount++;
+        setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'success' } : f));
+
+        // Fire-and-forget: AI extraction + Qonto matching in background
+        if (doc?.id) {
+          fetch(`/api/documents/process?id=${doc.id}`, { method: 'POST' })
+            .then(r => r.json())
+            .then(result => {
+              if (result.qontoPushed) {
+                toast.success(`${file.name} → Qonto ✓`);
+              }
+            })
+            .catch(() => {});
         }
       } catch (err) {
         errorCount++;
