@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Upload, X, Loader2, CheckCircle2, AlertCircle, FileText, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { createBrowserClient } from '@/lib/supabase';
 
 type FileStatus = 'pending' | 'uploading' | 'success' | 'error';
 
@@ -98,33 +99,51 @@ export function BulkUpload({ month, onComplete }: BulkUploadProps) {
     let successCount = 0;
     let errorCount = 0;
 
+    const supabase = createBrowserClient();
+
     for (let i = 0; i < files.length; i++) {
       setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'uploading' } : f));
 
-      const formData = new FormData();
-      formData.append('file', files[i].file);
-      formData.append('type', docType);
-      formData.append('category', category);
-      formData.append('month', month);
+      const file = files[i].file;
+      const sanitizedName = file.name.replace(/[#%?&=+]/g, '_');
+      const docId = crypto.randomUUID();
+      const bucket = docType === 'invoice' ? 'accounting-invoices' : 'accounting-tickets';
+      const storagePath = `${month}/${docId}/${sanitizedName}`;
 
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000); // 30s client timeout
+        // Step 1: Upload directly to Supabase Storage (bypasses Vercel WAF)
+        const { error: uploadError } = await supabase.storage
+          .from(bucket)
+          .upload(storagePath, file, {
+            contentType: file.type,
+            upsert: false,
+          });
 
-        const res = await fetch('/api/documents/upload', {
+        if (uploadError) {
+          throw new Error(`Storage: ${uploadError.message}`);
+        }
+
+        // Step 2: Register document in DB via lightweight API (no file in body)
+        const res = await fetch('/api/documents/register', {
           method: 'POST',
-          body: formData,
-          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            storagePath,
+            fileName: sanitizedName,
+            fileType: file.type,
+            fileSize: file.size,
+            type: docType,
+            category,
+            monthKey: month,
+          }),
         });
-        clearTimeout(timeout);
 
         let data;
         try {
           data = await res.json();
         } catch {
-          // Non-JSON response (e.g. Vercel timeout HTML page)
           errorCount++;
-          toast.error(`Erreur pour ${files[i].file.name}: Timeout serveur (${res.status})`);
+          toast.error(`Erreur pour ${file.name}: Erreur serveur (${res.status})`);
           setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error' } : f));
           continue;
         }
@@ -139,7 +158,7 @@ export function BulkUpload({ month, onComplete }: BulkUploadProps) {
               .then(r => r.json())
               .then(result => {
                 if (result.qontoPushed) {
-                  toast.success(`${files[i].file.name} → Qonto ✓`);
+                  toast.success(`${file.name} → Qonto ✓`);
                 }
               })
               .catch(() => {});
@@ -147,13 +166,13 @@ export function BulkUpload({ month, onComplete }: BulkUploadProps) {
         } else {
           errorCount++;
           const errMsg = data?.error || `Erreur ${res.status}`;
-          toast.error(`Erreur pour ${files[i].file.name}: ${errMsg}`);
+          toast.error(`Erreur pour ${file.name}: ${errMsg}`);
           setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error' } : f));
         }
       } catch (err) {
         errorCount++;
-        const msg = err instanceof Error && err.name === 'AbortError' ? 'Timeout (30s)' : 'Erreur réseau';
-        toast.error(`Erreur pour ${files[i].file.name}: ${msg}`);
+        const msg = err instanceof Error ? err.message : 'Erreur réseau';
+        toast.error(`Erreur pour ${file.name}: ${msg}`);
         setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error' } : f));
       }
 
