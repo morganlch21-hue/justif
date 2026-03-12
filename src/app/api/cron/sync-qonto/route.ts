@@ -7,13 +7,13 @@ export const maxDuration = 60;
 
 /**
  * Cron job: sync Qonto transactions + auto-push unmatched documents.
- * Runs every 30 minutes via Vercel Cron.
- * Secured via CRON_SECRET env var.
+ * Runs every 30 minutes via external cron (cron-job.org).
+ * Secured via CRON_SECRET query param.
  */
 export async function GET(request: Request) {
-  // Verify cron secret (Vercel sets this header automatically)
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const { searchParams } = new URL(request.url);
+  const secret = searchParams.get('secret') || request.headers.get('authorization')?.replace('Bearer ', '');
+  if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

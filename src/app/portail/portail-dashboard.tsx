@@ -18,12 +18,19 @@ export function PortailDashboard({ token }: Props) {
   const [month, setMonth] = useState(getCurrentMonthKey());
   const [missingCount, setMissingCount] = useState(0);
 
-  // Fetch missing count eagerly so the badge updates on month change
+  // Sync Qonto in background on load, then fetch missing count
   useEffect(() => {
-    fetch(`/api/portail/missing?month=${month}&token=${token}`)
-      .then(r => r.json())
-      .then(data => setMissingCount((data.transactions || []).length))
-      .catch(() => setMissingCount(0));
+    const syncThenFetchMissing = async () => {
+      try {
+        await fetch(`/api/qonto/sync?month=${month}`, { method: 'POST' });
+      } catch { /* ignore sync errors */ }
+      try {
+        const r = await fetch(`/api/portail/missing?month=${month}&token=${token}`);
+        const data = await r.json();
+        setMissingCount((data.transactions || []).length);
+      } catch { setMissingCount(0); }
+    };
+    syncThenFetchMissing();
   }, [month, token]);
 
   const handleMissingCount = useCallback((count: number) => {
