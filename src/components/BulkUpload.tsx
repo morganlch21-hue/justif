@@ -133,8 +133,16 @@ export function BulkUpload({ month, onComplete }: BulkUploadProps) {
           successCount++;
           setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'success' } : f));
 
-          if (data.qontoPushed) {
-            toast.success(`${files[i].file.name} → Qonto ✓`);
+          // Fire-and-forget: AI extraction + Qonto matching in background
+          if (data.document?.id) {
+            fetch(`/api/documents/process?id=${data.document.id}`, { method: 'POST' })
+              .then(r => r.json())
+              .then(result => {
+                if (result.qontoPushed) {
+                  toast.success(`${files[i].file.name} → Qonto ✓`);
+                }
+              })
+              .catch(() => {});
           }
         } else {
           errorCount++;

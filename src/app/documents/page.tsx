@@ -8,7 +8,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, Search, CheckCheck, FolderOpen, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { RefreshCw, Search, CheckCheck, FolderOpen, Loader2, X, Check, Ban, ListChecks } from 'lucide-react';
 import { getCurrentMonthKey, type AccountingDocument } from '@/lib/types';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,15 @@ export default function DocumentsPage() {
   const [confirming, setConfirming] = useState(false);
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Preview
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<AccountingDocument | null>(null);
+
+  // Multi-select
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
@@ -39,6 +49,12 @@ export default function DocumentsPage() {
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
+
+  // Reset selection when month or filter changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  }, [month, type]);
 
   const filteredByType = useMemo(() => {
     if (type === 'supplier') return allDocuments.filter(d => d.type === 'invoice' && d.category !== 'client');
@@ -119,20 +135,67 @@ export default function DocumentsPage() {
     }
   }
 
+  // Preview: open modal with document
   async function handlePreview(id: string) {
+    const doc = allDocuments.find(d => d.id === id);
+    if (!doc) return;
+    setPreviewDoc(doc);
+    setPreviewLoading(true);
+    setPreviewUrl(null);
+
     try {
       const res = await fetch(`/api/documents/preview?id=${id}`);
       const data = await res.json();
       if (res.ok && data.url) {
-        window.open(data.url, '_blank');
+        setPreviewUrl(data.url);
       } else {
-        toast.error('Impossible d\'ouvrir le document');
+        toast.error('Impossible de charger l\'aperçu');
+        setPreviewDoc(null);
       }
     } catch {
       toast.error('Erreur de chargement');
+      setPreviewDoc(null);
+    } finally {
+      setPreviewLoading(false);
     }
   }
 
+  // Multi-select: toggle selection
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Multi-select: select all visible
+  function selectAll() {
+    setSelectedIds(new Set(documents.map(d => d.id)));
+  }
+
+  // Multi-select: bulk action
+  async function handleBulkAction(status: 'confirmed' | 'ignored') {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    try {
+      await fetch('/api/documents', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, status }),
+      });
+      toast.success(`${ids.length} document(s) ${status === 'confirmed' ? 'confirmé(s)' : 'ignoré(s)'}`);
+      if (status === 'confirmed') {
+        fetch(`/api/qonto/auto-push?month=${month}`, { method: 'POST' }).catch(() => {});
+      }
+      fetchDocuments();
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+    } catch {
+      toast.error('Erreur');
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -147,15 +210,51 @@ export default function DocumentsPage() {
               </span>
             )}
           </div>
-          <Button variant="ghost" size="icon" onClick={handleRefresh} className="text-muted-foreground">
-            <RefreshCw className={cn("h-4 w-4 transition-transform", refreshing && "animate-spin")} />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant={selectionMode ? 'default' : 'ghost'}
+              size="icon"
+              onClick={() => { setSelectionMode(!selectionMode); setSelectedIds(new Set()); }}
+              className={cn('text-muted-foreground', selectionMode && 'text-white')}
+              title="Mode sélection"
+            >
+              <ListChecks className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleRefresh} className="text-muted-foreground">
+              <RefreshCw className={cn("h-4 w-4 transition-transform", refreshing && "animate-spin")} />
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-3 px-4 pb-24 animate-fade-in">
         {/* Bulk Upload */}
-        <BulkUpload month={month} onComplete={fetchDocuments} />
+        {!selectionMode && <BulkUpload month={month} onComplete={fetchDocuments} />}
+
+        {/* Selection toolbar */}
+        {selectionMode && (
+          <div className="flex items-center gap-2 rounded-xl bg-blue-50 p-3">
+            <span className="text-sm font-medium text-blue-700">
+              {selectedIds.size} sélectionné(s)
+            </span>
+            <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-600" onClick={selectAll}>
+              Tout sélectionner
+            </Button>
+            <div className="flex-1" />
+            <Button size="sm" className="h-7 text-xs" onClick={() => handleBulkAction('confirmed')} disabled={selectedIds.size === 0}>
+              <Check className="mr-1 h-3 w-3" />
+              Confirmer
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleBulkAction('ignored')} disabled={selectedIds.size === 0}>
+              <Ban className="mr-1 h-3 w-3" />
+              Ignorer
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }}>
+              <X className="mr-1 h-3 w-3" />
+              Annuler
+            </Button>
+          </div>
+        )}
 
         {/* Month + Tabs */}
         <div className="flex items-center justify-between">
@@ -181,8 +280,8 @@ export default function DocumentsPage() {
           />
         </div>
 
-        {/* Bulk confirm */}
-        {toVerifyDocs.length > 1 && (
+        {/* Bulk confirm (non-selection mode) */}
+        {!selectionMode && toVerifyDocs.length > 1 && (
           <Button
             variant="outline"
             size="sm"
@@ -226,11 +325,64 @@ export default function DocumentsPage() {
                 onStatusChange={handleStatusChange}
                 onDelete={handleDelete}
                 onPreview={handlePreview}
+                selectionMode={selectionMode}
+                selected={selectedIds.has(doc.id)}
+                onSelect={toggleSelect}
               />
             ))}
           </div>
         )}
       </main>
+
+      {/* Preview Modal */}
+      <Dialog open={!!previewDoc} onOpenChange={(open) => { if (!open) { setPreviewDoc(null); setPreviewUrl(null); } }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+          {previewDoc && (
+            <div className="flex flex-col h-full max-h-[90vh]">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b">
+                <div className="min-w-0 pr-8">
+                  <p className="text-sm font-medium truncate">{previewDoc.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {previewDoc.type === 'invoice' ? 'Facture' : 'Ticket'}
+                    {' · '}
+                    {new Date(previewDoc.created_at).toLocaleDateString('fr-FR')}
+                    {previewDoc.extracted_vendor && ` · ${previewDoc.extracted_vendor}`}
+                    {previewDoc.amount_cents && ` · ${(previewDoc.amount_cents / 100).toFixed(2)}€`}
+                  </p>
+                </div>
+              </div>
+              {/* Content */}
+              <div className="flex-1 overflow-auto bg-gray-100">
+                {previewLoading ? (
+                  <div className="flex items-center justify-center h-96">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : previewUrl ? (
+                  previewDoc.file_type.startsWith('image/') ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={previewUrl}
+                      alt={previewDoc.title}
+                      className="mx-auto max-h-[80vh] object-contain"
+                    />
+                  ) : (
+                    <iframe
+                      src={previewUrl}
+                      className="w-full h-[80vh]"
+                      title={previewDoc.title}
+                    />
+                  )
+                ) : (
+                  <div className="flex items-center justify-center h-96 text-muted-foreground">
+                    Impossible de charger l&apos;aperçu
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
