@@ -33,7 +33,9 @@ export async function POST(request: Request) {
     const monthKey = (formData.get('month') as string) || getCurrentMonthKey();
     const docId = crypto.randomUUID();
     const bucket = type === 'invoice' ? 'accounting-invoices' : 'accounting-tickets';
-    const storagePath = `${monthKey}/${docId}/${file.name}`;
+    // Sanitize filename: remove # and other problematic URL characters
+    const sanitizedName = file.name.replace(/[#%?&=+]/g, '_');
+    const storagePath = `${monthKey}/${docId}/${sanitizedName}`;
 
     // Upload to Supabase Storage
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -60,7 +62,7 @@ export async function POST(request: Request) {
         title,
         description: description || null,
         storage_path: storagePath,
-        file_name: file.name,
+        file_name: sanitizedName,
         file_type: file.type,
         file_size_bytes: file.size,
         month_key: monthKey,
@@ -98,7 +100,7 @@ export async function POST(request: Request) {
 
         if (matchedTx) {
           const fileBuffer = Buffer.from(await (await supabase.storage.from(bucket).download(storagePath)).data!.arrayBuffer());
-          await uploadAttachment(matchedTx.id, fileBuffer, file.name, file.type);
+          await uploadAttachment(matchedTx.id, fileBuffer, sanitizedName, file.type);
           await supabase
             .from('accounting_documents')
             .update({
