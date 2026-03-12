@@ -143,7 +143,8 @@ export function findMatchingTransaction(
     }
 
     // Amount matching: strong signal if amounts match exactly
-    if (doc.amount_cents && doc.amount_cents > 0 && tx.amount_cents === doc.amount_cents) {
+    const amountMatch = doc.amount_cents && doc.amount_cents > 0 && tx.amount_cents === doc.amount_cents;
+    if (amountMatch) {
       score += 5;
     }
 
@@ -151,13 +152,23 @@ export function findMatchingTransaction(
     const docDate = new Date(doc.extracted_date || doc.created_at).getTime();
     const txDate = new Date(tx.settled_at).getTime();
     const daysDiff = Math.abs(docDate - txDate) / (1000 * 60 * 60 * 24);
-    if (daysDiff <= 1) score += 3;
-    else if (daysDiff <= 3) score += 1;
-    if (daysDiff <= 7) score += 1;
+    if (daysDiff <= 1) score += 5;
+    else if (daysDiff <= 3) score += 3;
+    else if (daysDiff <= 7) score += 1;
+    else if (daysDiff <= 15) score += 0;
+    else score -= 2; // Penalize if date is far off
+
+    // Combo bonus: exact amount + close date = very confident match
+    // Critical for cases like multiple Google Ads invoices from same vendor
+    if (amountMatch && daysDiff <= 3) {
+      score += 5;
+    }
 
     // For tickets: lower threshold since titles are generic (e.g. "Déjeuner")
-    // Match primarily on date proximity + small amount (typical restaurant/ticket amounts)
-    const threshold = isTicket ? 2 : 3;
+    // For invoices with extracted data: higher threshold to avoid mismatches
+    // (e.g. multiple Google Ads invoices from same vendor)
+    const hasExtractedData = doc.extracted_vendor || doc.extracted_date;
+    const threshold = isTicket ? 2 : (hasExtractedData ? 6 : 3);
 
     if (score > bestScore && score >= threshold) {
       bestScore = score;
