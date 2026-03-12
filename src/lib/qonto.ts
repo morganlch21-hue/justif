@@ -81,116 +81,92 @@ export async function uploadAttachment(
 }
 
 /**
- * Try to match a document to a Qonto transaction.
- * Uses keyword matching between doc metadata and transaction labels/counterparty,
- * plus amount comparison when available.
- * Returns the best matching transaction or null.
+ * Find the best matching transaction for a document.
+ *
+ * STRICT RULES to prevent false positives:
+ * - Invoices: MUST have exact amount match OR reference match. Keywords alone = NO match.
+ * - Tickets: MUST have amount match OR (vendor + close date).
+ * - This prevents cases like "Google Ads Proposition" matching a Google Ads 300EUR transaction.
  */
 export function findMatchingTransaction(
   doc: { gmail_sender?: string; gmail_subject?: string; title?: string; created_at: string; amount_cents?: number | null; type?: string; category?: string; extracted_vendor?: string | null; extracted_date?: string | null; extracted_datetime?: string | null; extracted_reference?: string | null },
   transactions: QontoTransactionAPI[]
 ): QontoTransactionAPI | null {
-  // Only match debit transactions without attachments
   const candidates = transactions.filter(
     tx => tx.side === 'debit' && (!tx.attachment_ids || tx.attachment_ids.length === 0)
   );
-
   if (candidates.length === 0) return null;
 
   const isTicket = doc.type === 'ticket';
-
-  // Extract keywords from document
   const docText = [
-    doc.gmail_sender || '',
-    doc.gmail_subject || '',
-    doc.title || '',
-    doc.extracted_vendor || '',
+    doc.gmail_sender || '', doc.gmail_subject || '',
+    doc.title || '', doc.extracted_vendor || '',
   ].join(' ').toLowerCase();
-
-  // Extract meaningful words (skip common/short words)
-  const skipWords = new Set(['facture', 'invoice', 'votre', 'your', 'pour', 'from', 'the', 'les', 'des', 'une', 'fwd', 'com', 'gmail', 'email', 'noreply', 'billing', 'no-reply', 'info', 'contact', 'hello', 'bonjour', 'merci', 'order', 'commande', 'confirmation', 'receipt', 'recu', 'numero', 'number', 'dejeuner', 'déjeuner', 'diner', 'dîner', 'repas', 'ticket']);
-  const docWords = docText
-    .replace(/[<>@.,;:!?()[\]{}""''#€$%&*+=/\\|~`^]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length >= 3 && !skipWords.has(w));
 
   let bestMatch: QontoTransactionAPI | null = null;
   let bestScore = 0;
 
   for (const tx of candidates) {
-    // Combine label and counterparty name for matching
     const txText = [tx.label || '', tx.clean_counterparty_name || ''].join(' ').toLowerCase().replace(/[*_\-]/g, ' ');
-    const txWords = txText.split(/\s+/).filter(w => w.length >= 3);
-
     let score = 0;
+    let hasAmountMatch = false;
+    let hasVendorMatch = false;
+    let hasDateMatch = false;
+    let hasReferenceMatch = false;
 
-    // Keyword matching: doc words in tx text
-    for (const dw of docWords) {
-      if (txText.includes(dw)) score += 2;
-    }
-    // Keyword matching: tx words in doc text
-    for (const tw of txWords) {
-      if (docText.includes(tw)) score += 2;
+    // --- AMOUNT: exact match (strongest signal) ---
+    if (doc.amount_cents && doc.amount_cents > 0 && tx.amount_cents === doc.amount_cents) {
+      score += 10;
+      hasAmountMatch = true;
     }
 
-    // Direct vendor-to-counterparty match: very strong signal
+    // --- VENDOR: extracted vendor vs counterparty ---
     if (doc.extracted_vendor) {
-      const vendorLower = doc.extracted_vendor.toLowerCase();
-      const counterparty = (tx.clean_counterparty_name || '').toLowerCase();
-      if (counterparty && vendorLower && (counterparty.includes(vendorLower) || vendorLower.includes(counterparty))) {
-        score += 4;
+      const v = doc.extracted_vendor.toLowerCase();
+      const c = (tx.clean_counterparty_name || '').toLowerCase();
+      if (c && v && (c.includes(v) || v.includes(c))) {
+        score += 5;
+        hasVendorMatch = true;
       }
     }
-
-    // Amount matching: strong signal if amounts match exactly
-    const amountMatch = doc.amount_cents && doc.amount_cents > 0 && tx.amount_cents === doc.amount_cents;
-    if (amountMatch) {
-      score += 5;
+    // Fallback: keyword matching (weak, capped at 3)
+    if (!hasVendorMatch) {
+      const skip = new Set(['facture','invoice','votre','your','pour','from','the','les','des','une','fwd','com','gmail','email','noreply','billing','no-reply','info','contact','hello','bonjour','merci','order','commande','confirmation','receipt','recu','numero','number','dejeuner','diner','repas','ticket','proposition','devis','pro','cloud','platform','apis','payment','received','available']);
+      const words = docText.replace(/[<>@.,;:!?()[\]{}#$%&*+=/\\|~`^]/g, ' ').split(/\s+/).filter(w => w.length >= 3 && !skip.has(w));
+      let hits = 0;
+      for (const w of words) { if (txText.includes(w)) hits++; }
+      if (hits > 0) score += Math.min(hits, 3);
+      if (hits >= 2) hasVendorMatch = true;
     }
 
-    // Precise datetime matching (for same-day duplicates like 2x Meta Ads)
-    // Use extracted_datetime if available for hour-level precision
+    // --- DATE: proximity ---
     const docDateStr = doc.extracted_datetime || doc.extracted_date || doc.created_at;
-    const docDate = new Date(docDateStr).getTime();
-    const txDate = new Date(tx.settled_at).getTime();
-    const hoursDiff = Math.abs(docDate - txDate) / (1000 * 60 * 60);
+    const hoursDiff = Math.abs(new Date(docDateStr).getTime() - new Date(tx.settled_at).getTime()) / 3600000;
     const daysDiff = hoursDiff / 24;
 
-    // Hour-level proximity when we have datetime (critical for same-day duplicates)
-    if (doc.extracted_datetime && hoursDiff <= 2) {
-      score += 8; // Very close in time = very strong match
-    } else if (doc.extracted_datetime && hoursDiff <= 6) {
-      score += 5;
-    } else if (daysDiff <= 1) {
-      score += 5;
-    } else if (daysDiff <= 3) {
-      score += 3;
-    } else if (daysDiff <= 7) {
-      score += 1;
-    } else if (daysDiff > 15) {
-      score -= 2; // Penalize if date is far off
-    }
+    if (doc.extracted_datetime && hoursDiff <= 2) { score += 8; hasDateMatch = true; }
+    else if (doc.extracted_datetime && hoursDiff <= 6) { score += 5; hasDateMatch = true; }
+    else if (daysDiff <= 1) { score += 5; hasDateMatch = true; }
+    else if (daysDiff <= 3) { score += 3; hasDateMatch = true; }
+    else if (daysDiff <= 7) { score += 1; }
+    else if (daysDiff > 30) { score -= 5; }
+    else if (daysDiff > 15) { score -= 2; }
 
-    // Reference/ID matching against transaction label
+    // --- REFERENCE: invoice number in tx label ---
     if (doc.extracted_reference) {
-      const refLower = doc.extracted_reference.toLowerCase();
-      const txLabel = (tx.label || '').toLowerCase();
-      if (txLabel.includes(refLower) || refLower.includes(tx.id || '')) {
-        score += 10; // Reference match = definitive
+      const ref = doc.extracted_reference.toLowerCase();
+      const label = (tx.label || '').toLowerCase();
+      if (label.includes(ref) || ref.includes(tx.id || '')) {
+        score += 15;
+        hasReferenceMatch = true;
       }
     }
 
-    // Combo bonus: exact amount + close date = very confident match
-    if (amountMatch && daysDiff <= 3) {
-      score += 5;
-    }
+    // === STRICT GATE: reject insufficient evidence ===
+    if (!isTicket && !hasAmountMatch && !hasReferenceMatch) continue;
+    if (isTicket && !hasAmountMatch && !(hasVendorMatch && hasDateMatch)) continue;
 
-    // For tickets: lower threshold since titles are generic (e.g. "Déjeuner")
-    // For invoices with extracted data: higher threshold to avoid mismatches
-    // (e.g. multiple Google Ads invoices from same vendor)
-    const hasExtractedData = doc.extracted_vendor || doc.extracted_date;
-    const threshold = isTicket ? 2 : (hasExtractedData ? 6 : 3);
-
+    const threshold = isTicket ? 5 : 10;
     if (score > bestScore && score >= threshold) {
       bestScore = score;
       bestMatch = tx;
