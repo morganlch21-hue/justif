@@ -34,9 +34,10 @@ export async function extractDocumentData(
 ): Promise<ExtractedDocData | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    console.warn('ANTHROPIC_API_KEY not set, skipping document extraction');
+    console.error('ANTHROPIC_API_KEY not set, skipping document extraction');
     return null;
   }
+  console.log(`[extract] Starting extraction, fileType=${fileType}, bufferSize=${fileBuffer.length}`);
 
   try {
     const base64Data = fileBuffer.toString('base64');
@@ -62,7 +63,7 @@ export async function extractDocumentData(
         };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 25000); // 25s for large PDFs
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -91,12 +92,13 @@ export async function extractDocumentData(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Claude API error:', response.status, errorText);
+      console.error('[extract] Claude API error:', response.status, errorText.substring(0, 300));
       return null;
     }
 
     const result = await response.json();
     const text = result.content?.[0]?.text;
+    console.log('[extract] Claude response:', text?.substring(0, 200));
     if (!text) return null;
 
     // Parse JSON response (handle potential markdown wrapping)

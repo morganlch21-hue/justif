@@ -69,8 +69,8 @@ export async function POST(request: Request) {
           .update({ extraction_status: 'failed' })
           .eq('id', docId);
       }
-    } catch {
-      console.error('Extraction error (non-blocking)');
+    } catch (extractErr) {
+      console.error('Extraction error (non-blocking):', extractErr);
       await supabase
         .from('accounting_documents')
         .update({ extraction_status: 'failed' })
