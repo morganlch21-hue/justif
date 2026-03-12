@@ -133,13 +133,13 @@ export async function POST(request: Request) {
         });
         const transactions = response.transactions || [];
         const matchedTx = findMatchingTransaction(
-          { ...data, type, category, extracted_vendor: extractedData?.vendor, extracted_date: extractedData?.document_date },
+          { ...data, type, category, extracted_vendor: extractedData?.vendor, extracted_date: extractedData?.document_date, extracted_datetime: extractedData?.document_datetime, extracted_reference: extractedData?.reference },
           transactions
         );
 
         if (matchedTx) {
-          const fileBuffer = Buffer.from(await (await supabase.storage.from(bucket).download(storagePath)).data!.arrayBuffer());
-          await uploadAttachment(matchedTx.id, fileBuffer, sanitizedName, file.type);
+          // Reuse existing buffer instead of re-downloading from storage
+          await uploadAttachment(matchedTx.id, buffer, sanitizedName, file.type);
           await supabase
             .from('accounting_documents')
             .update({

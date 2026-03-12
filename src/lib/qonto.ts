@@ -87,7 +87,7 @@ export async function uploadAttachment(
  * Returns the best matching transaction or null.
  */
 export function findMatchingTransaction(
-  doc: { gmail_sender?: string; gmail_subject?: string; title?: string; created_at: string; amount_cents?: number | null; type?: string; category?: string; extracted_vendor?: string | null; extracted_date?: string | null },
+  doc: { gmail_sender?: string; gmail_subject?: string; title?: string; created_at: string; amount_cents?: number | null; type?: string; category?: string; extracted_vendor?: string | null; extracted_date?: string | null; extracted_datetime?: string | null; extracted_reference?: string | null },
   transactions: QontoTransactionAPI[]
 ): QontoTransactionAPI | null {
   // Only match debit transactions without attachments
@@ -148,18 +148,39 @@ export function findMatchingTransaction(
       score += 5;
     }
 
-    // Date proximity bonus (prefer extracted document date over upload date)
-    const docDate = new Date(doc.extracted_date || doc.created_at).getTime();
+    // Precise datetime matching (for same-day duplicates like 2x Meta Ads)
+    // Use extracted_datetime if available for hour-level precision
+    const docDateStr = doc.extracted_datetime || doc.extracted_date || doc.created_at;
+    const docDate = new Date(docDateStr).getTime();
     const txDate = new Date(tx.settled_at).getTime();
-    const daysDiff = Math.abs(docDate - txDate) / (1000 * 60 * 60 * 24);
-    if (daysDiff <= 1) score += 5;
-    else if (daysDiff <= 3) score += 3;
-    else if (daysDiff <= 7) score += 1;
-    else if (daysDiff <= 15) score += 0;
-    else score -= 2; // Penalize if date is far off
+    const hoursDiff = Math.abs(docDate - txDate) / (1000 * 60 * 60);
+    const daysDiff = hoursDiff / 24;
+
+    // Hour-level proximity when we have datetime (critical for same-day duplicates)
+    if (doc.extracted_datetime && hoursDiff <= 2) {
+      score += 8; // Very close in time = very strong match
+    } else if (doc.extracted_datetime && hoursDiff <= 6) {
+      score += 5;
+    } else if (daysDiff <= 1) {
+      score += 5;
+    } else if (daysDiff <= 3) {
+      score += 3;
+    } else if (daysDiff <= 7) {
+      score += 1;
+    } else if (daysDiff > 15) {
+      score -= 2; // Penalize if date is far off
+    }
+
+    // Reference/ID matching against transaction label
+    if (doc.extracted_reference) {
+      const refLower = doc.extracted_reference.toLowerCase();
+      const txLabel = (tx.label || '').toLowerCase();
+      if (txLabel.includes(refLower) || refLower.includes(tx.id || '')) {
+        score += 10; // Reference match = definitive
+      }
+    }
 
     // Combo bonus: exact amount + close date = very confident match
-    // Critical for cases like multiple Google Ads invoices from same vendor
     if (amountMatch && daysDiff <= 3) {
       score += 5;
     }

@@ -113,24 +113,18 @@ export function BulkUpload({ month, onComplete }: BulkUploadProps) {
           body: formData,
         });
 
+        const data = await res.json();
         if (res.ok) {
           successCount++;
           setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'success' } : f));
 
-          // Auto-push Qonto
-          const data = await res.json();
-          if (data.document?.id) {
-            fetch(`/api/qonto/auto-push?documentId=${data.document.id}`, { method: 'POST' })
-              .then(r => r.json())
-              .then(pushData => {
-                if (pushData.pushed > 0) {
-                  toast.success(`${files[i].file.name} → Qonto ✓`);
-                }
-              })
-              .catch(() => {});
+          if (data.qontoPushed) {
+            toast.success(`${files[i].file.name} → Qonto ✓`);
           }
         } else {
           errorCount++;
+          const errMsg = data?.error || 'Erreur inconnue';
+          toast.error(`Erreur pour ${files[i].file.name}: ${errMsg}`);
           setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error' } : f));
         }
       } catch {
