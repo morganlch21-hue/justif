@@ -59,8 +59,12 @@ export function TicketCapture() {
         throw new Error(data.error || 'Erreur lors de l\'envoi');
       }
 
+      const result = await res.json();
       setSuccess(true);
-      toast.success('Ticket enregistré !');
+      toast.success(result.qontoPushed
+        ? 'Ticket enregistré et envoyé sur Qonto !'
+        : 'Ticket enregistré !'
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erreur lors de l\'envoi');
     } finally {

@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase';
 import { getCurrentMonthKey } from '@/lib/types';
+import { listTransactions, getMonthRange, uploadAttachment, findMatchingTransaction } from '@/lib/qonto';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
@@ -77,7 +78,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erreur base de données' }, { status: 500 });
     }
 
-    return NextResponse.json({ document: data });
+    // Auto-push to Qonto: try to match and attach to a transaction
+    let qontoPushed = false;
+    if (category !== 'client') {
+      try {
+        const { from, to } = getMonthRange(monthKey);
+        const response = await listTransactions({
+          bankAccountId: process.env.QONTO_BANK_ACCOUNT_ID,
+          settledAtFrom: from,
+          settledAtTo: to,
+          status: 'completed',
+          perPage: 100,
+        });
+        const transactions = response.transactions || [];
+        const matchedTx = findMatchingTransaction(
+          { ...data, type, category },
+          transactions
+        );
+
+        if (matchedTx) {
+          const fileBuffer = Buffer.from(await (await supabase.storage.from(bucket).download(storagePath)).data!.arrayBuffer());
+          await uploadAttachment(matchedTx.id, fileBuffer, file.name, file.type);
+          await supabase
+            .from('accounting_documents')
+            .update({
+              qonto_transaction_id: matchedTx.id,
+              qonto_attachment_sent: true,
+              qonto_attachment_sent_at: new Date().toISOString(),
+            })
+            .eq('id', docId);
+          qontoPushed = true;
+        }
+      } catch (err) {
+        console.error('Auto-push to Qonto failed:', err);
+        // Non-blocking: document is still saved successfully
+      }
+    }
+
+    return NextResponse.json({ document: data, qontoPushed });
   } catch (err) {
     console.error('Upload error:', err);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
