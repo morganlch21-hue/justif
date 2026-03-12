@@ -24,81 +24,66 @@ Règles :
 - Réponds UNIQUEMENT avec le JSON, sans commentaire ni markdown.`;
 
 /**
- * Extract structured data from a document (PDF or image) using Claude Vision.
+ * Extract structured data from a document (PDF or image) using Google Gemini.
+ * Uses Gemini 2.5 Flash (free tier: 15 RPM, 1000 req/day).
  * Returns null on any failure (timeout, API error, parse error).
- * Has a 5-second timeout to stay within Vercel's 10s function limit.
  */
 export async function extractDocumentData(
   fileBuffer: Buffer,
   fileType: string
 ): Promise<ExtractedDocData | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error('ANTHROPIC_API_KEY not set, skipping document extraction');
+    console.error('[extract] GEMINI_API_KEY not set, skipping document extraction');
     return null;
   }
-  console.log(`[extract] Starting extraction, fileType=${fileType}, bufferSize=${fileBuffer.length}`);
+  console.log(`[extract] Starting Gemini extraction, fileType=${fileType}, bufferSize=${fileBuffer.length}`);
 
   try {
     const base64Data = fileBuffer.toString('base64');
-    const isPdf = fileType === 'application/pdf';
-
-    // Build the content block based on file type
-    const fileContent = isPdf
-      ? {
-          type: 'document' as const,
-          source: {
-            type: 'base64' as const,
-            media_type: 'application/pdf' as const,
-            data: base64Data,
-          },
-        }
-      : {
-          type: 'image' as const,
-          source: {
-            type: 'base64' as const,
-            media_type: fileType as 'image/jpeg' | 'image/png' | 'image/webp',
-            data: base64Data,
-          },
-        };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000); // 25s for large PDFs
+    const timeout = setTimeout(() => controller.abort(), 25000);
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-20250414',
-        max_tokens: 512,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              fileContent,
-              { type: 'text', text: EXTRACTION_PROMPT },
-            ],
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  inline_data: {
+                    mime_type: fileType,
+                    data: base64Data,
+                  },
+                },
+                { text: EXTRACTION_PROMPT },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 512,
           },
-        ],
-      }),
-      signal: controller.signal,
-    });
+        }),
+        signal: controller.signal,
+      }
+    );
 
     clearTimeout(timeout);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[extract] Claude API error:', response.status, errorText.substring(0, 300));
+      console.error('[extract] Gemini API error:', response.status, errorText.substring(0, 300));
       return null;
     }
 
     const result = await response.json();
-    const text = result.content?.[0]?.text;
-    console.log('[extract] Claude response:', text?.substring(0, 200));
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    console.log('[extract] Gemini response:', text?.substring(0, 200));
     if (!text) return null;
 
     // Parse JSON response (handle potential markdown wrapping)
@@ -115,10 +100,10 @@ export async function extractDocumentData(
     };
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
-      console.warn('Claude extraction timed out');
+      console.warn('[extract] Gemini extraction timed out');
       return null;
     }
-    console.error('Document extraction error:', err);
+    console.error('[extract] Document extraction error:', err);
     return null;
   }
 }
