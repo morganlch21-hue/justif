@@ -114,10 +114,20 @@ export function findMatchingTransaction(
     let hasDateMatch = false;
     let hasReferenceMatch = false;
 
-    // --- AMOUNT: exact match (strongest signal) ---
-    if (doc.amount_cents && doc.amount_cents > 0 && tx.amount_cents === doc.amount_cents) {
-      score += 10;
-      hasAmountMatch = true;
+    // --- AMOUNT: exact or approximate match ---
+    if (doc.amount_cents && doc.amount_cents > 0) {
+      if (tx.amount_cents === doc.amount_cents) {
+        // Exact match
+        score += 10;
+        hasAmountMatch = true;
+      } else {
+        // Approximate match (±10% tolerance for currency conversion / fees)
+        const ratio = tx.amount_cents / doc.amount_cents;
+        if (ratio >= 0.90 && ratio <= 1.10) {
+          score += 7;
+          hasAmountMatch = true;
+        }
+      }
     }
 
     // --- VENDOR: extracted vendor vs counterparty ---
