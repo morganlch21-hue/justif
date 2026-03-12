@@ -108,12 +108,27 @@ export function BulkUpload({ month, onComplete }: BulkUploadProps) {
       formData.append('month', month);
 
       try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000); // 30s client timeout
+
         const res = await fetch('/api/documents/upload', {
           method: 'POST',
           body: formData,
+          signal: controller.signal,
         });
+        clearTimeout(timeout);
 
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch {
+          // Non-JSON response (e.g. Vercel timeout HTML page)
+          errorCount++;
+          toast.error(`Erreur pour ${files[i].file.name}: Timeout serveur (${res.status})`);
+          setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error' } : f));
+          continue;
+        }
+
         if (res.ok) {
           successCount++;
           setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'success' } : f));
@@ -123,12 +138,14 @@ export function BulkUpload({ month, onComplete }: BulkUploadProps) {
           }
         } else {
           errorCount++;
-          const errMsg = data?.error || 'Erreur inconnue';
+          const errMsg = data?.error || `Erreur ${res.status}`;
           toast.error(`Erreur pour ${files[i].file.name}: ${errMsg}`);
           setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error' } : f));
         }
-      } catch {
+      } catch (err) {
         errorCount++;
+        const msg = err instanceof Error && err.name === 'AbortError' ? 'Timeout (30s)' : 'Erreur réseau';
+        toast.error(`Erreur pour ${files[i].file.name}: ${msg}`);
         setFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error' } : f));
       }
 
