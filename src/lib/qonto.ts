@@ -121,10 +121,10 @@ export function findMatchingTransaction(
         score += 10;
         hasAmountMatch = true;
       } else {
-        // Approximate match (±10% tolerance for currency conversion / fees)
+        // Approximate match (±15% tolerance for currency conversion USD/EUR + bank fees)
         const ratio = tx.amount_cents / doc.amount_cents;
-        if (ratio >= 0.90 && ratio <= 1.10) {
-          score += 7;
+        if (ratio >= 0.85 && ratio <= 1.15) {
+          score += 6;
           hasAmountMatch = true;
         }
       }
