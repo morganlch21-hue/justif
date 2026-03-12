@@ -33,8 +33,8 @@ export default function DashboardPage() {
   const [syncing, setSyncing] = useState(false);
   const [showAllMissing, setShowAllMissing] = useState(false);
 
-  const fetchStats = useCallback(async () => {
-    setLoading(true);
+  const fetchStats = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/documents?month=${month}`);
       const { documents } = await res.json() as { documents: AccountingDocument[] };
@@ -62,12 +62,17 @@ export default function DashboardPage() {
     } catch {
       toast.error('Erreur de chargement');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [month]);
 
   useEffect(() => {
     fetchStats();
+    // Background sync: silently sync Qonto on page load without blocking UI
+    fetch(`/api/qonto/sync?month=${month}`, { method: 'POST' })
+      .then(() => fetchStats(true))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchStats]);
 
   async function autoPushQonto() {
