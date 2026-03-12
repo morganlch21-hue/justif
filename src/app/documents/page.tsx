@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { MonthSelector } from '@/components/MonthSelector';
 import { DocumentCard } from '@/components/DocumentCard';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,21 +8,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, Loader2, Upload, Search, CheckCheck, FolderOpen } from 'lucide-react';
+import { RefreshCw, Search, CheckCheck, FolderOpen, Loader2 } from 'lucide-react';
 import { getCurrentMonthKey, type AccountingDocument } from '@/lib/types';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { BulkUpload } from '@/components/BulkUpload';
 
 export default function DocumentsPage() {
   const [month, setMonth] = useState(getCurrentMonthKey());
   const [type, setType] = useState<string>('all');
   const [allDocuments, setAllDocuments] = useState<AccountingDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
@@ -134,55 +133,6 @@ export default function DocumentsPage() {
     }
   }
 
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploading(true);
-    let uploaded = 0;
-
-    for (const file of Array.from(files)) {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', 'invoice');
-      formData.append('category', 'supplier');
-      formData.append('month', month);
-
-      try {
-        const res = await fetch('/api/documents/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        if (res.ok) {
-          uploaded++;
-          const data = await res.json();
-          if (data.document?.id) {
-            fetch(`/api/qonto/auto-push?documentId=${data.document.id}`, { method: 'POST' })
-              .then(r => r.json())
-              .then(pushData => {
-                if (pushData.pushed > 0) {
-                  toast.success(`${file.name} envoyée sur Qonto`);
-                  fetchDocuments();
-                }
-              })
-              .catch(() => {});
-          }
-        } else {
-          toast.error(`Erreur pour ${file.name}`);
-        }
-      } catch {
-        toast.error(`Erreur pour ${file.name}`);
-      }
-    }
-
-    if (uploaded > 0) {
-      toast.success(`${uploaded} facture(s) importée(s)`);
-      fetchDocuments();
-    }
-
-    setUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -197,33 +147,16 @@ export default function DocumentsPage() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="text-muted-foreground"
-            >
-              {uploading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Upload className="mr-1.5 h-4 w-4" />}
-              Importer
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.png,.jpg,.jpeg"
-              multiple
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-            <Button variant="ghost" size="icon" onClick={handleRefresh} className="text-muted-foreground">
-              <RefreshCw className={cn("h-4 w-4 transition-transform", refreshing && "animate-spin")} />
-            </Button>
-          </div>
+          <Button variant="ghost" size="icon" onClick={handleRefresh} className="text-muted-foreground">
+            <RefreshCw className={cn("h-4 w-4 transition-transform", refreshing && "animate-spin")} />
+          </Button>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-3 px-4 pb-24 animate-fade-in">
+        {/* Bulk Upload */}
+        <BulkUpload month={month} onComplete={fetchDocuments} />
+
         {/* Month + Tabs */}
         <div className="flex items-center justify-between">
           <MonthSelector value={month} onChange={setMonth} />
