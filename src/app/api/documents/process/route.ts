@@ -59,10 +59,21 @@ export async function POST(request: Request) {
           updateFields.title = extractedData.description;
         }
         // Auto-ignorer les documents qui ne sont pas des factures
-        // (pas de montant ET pas de fournisseur = screenshot, email, notification...)
         const finalAmount = extractedData.amount_cents || doc.amount_cents;
         const finalVendor = extractedData.vendor;
+        // Cas 1: pas de montant ET pas de fournisseur = screenshot, email, notification...
         if (!finalAmount && !finalVendor) {
+          updateFields.status = 'ignored';
+        }
+        // Cas 2: titre/sujet contient des mots-clés de non-facture (devis, proposition, reporting...)
+        const titleLower = (doc.title || '').toLowerCase();
+        const NON_INVOICE_KEYWORDS = [
+          'devis', 'proposition', 'reporting', 'optimisation', 'consultation',
+          'confirmation de commande', 'commande validée', 'commande est validée',
+          'relevé de visite', 'visite technique', 'tracking', 'data &',
+          'invitation au call', 'analyse concurrentielle', 'actualisation',
+        ];
+        if (!finalAmount && NON_INVOICE_KEYWORDS.some(kw => titleLower.includes(kw))) {
           updateFields.status = 'ignored';
         }
         await supabase
