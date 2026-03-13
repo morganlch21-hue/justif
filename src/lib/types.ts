@@ -27,7 +27,8 @@ export interface AccountingDocument {
   extracted_vendor: string | null;
   extracted_date: string | null;
   extraction_status: 'success' | 'failed' | 'timeout' | null;
-  status: 'confirmed' | 'to_verify' | 'ignored';
+  qonto_multi_tx_ids: string[] | null;
+  status: 'confirmed' | 'to_verify' | 'ignored' | 'no_qonto_match';
   created_at: string;
   updated_at: string;
 }

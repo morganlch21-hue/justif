@@ -186,6 +186,63 @@ export function findMatchingTransaction(
   return bestMatch;
 }
 
+/**
+ * Multi-transaction vendors: one invoice covers multiple Qonto debits.
+ * e.g. Google Ads monthly invoice = 5 separate daily debits.
+ * Key: lowercase pattern to match in extracted_vendor.
+ * Value: lowercase patterns to match in Qonto counterparty_name.
+ */
+export const MULTI_TX_VENDORS: Record<string, string[]> = {
+  'google ads': ['google'],
+  'google ireland': ['google'],
+  'google cloud': ['google'],
+};
+
+/**
+ * No-match vendors: fees deducted from payouts, no Qonto debit exists.
+ * e.g. GoCardless 9€/month service fees deducted from collected payments.
+ */
+export const NO_MATCH_VENDORS = ['gocardless'];
+
+/**
+ * Check if a vendor name matches a multi-tx pattern.
+ * Returns the Qonto counterparty patterns to search for, or null.
+ */
+export function getMultiTxPatterns(vendor: string | null | undefined): string[] | null {
+  if (!vendor) return null;
+  const v = vendor.toLowerCase();
+  for (const [pattern, counterpartyPatterns] of Object.entries(MULTI_TX_VENDORS)) {
+    if (v.includes(pattern)) return counterpartyPatterns;
+  }
+  return null;
+}
+
+/**
+ * Check if a vendor is a no-match vendor (fees deducted from payouts).
+ */
+export function isNoMatchVendor(vendor: string | null | undefined): boolean {
+  if (!vendor) return false;
+  const v = vendor.toLowerCase();
+  return NO_MATCH_VENDORS.some(pattern => v.includes(pattern));
+}
+
+/**
+ * Find ALL matching transactions for a multi-transaction vendor.
+ * Used when one invoice covers multiple Qonto debits (e.g. Google Ads).
+ * Only matches debit transactions from the vendor, regardless of attachment status
+ * (the same invoice should be on ALL transactions).
+ */
+export function findAllMatchingTransactions(
+  counterpartyPatterns: string[],
+  transactions: QontoTransactionAPI[]
+): QontoTransactionAPI[] {
+  return transactions.filter(tx => {
+    if (tx.side !== 'debit') return false;
+    const name = (tx.clean_counterparty_name || '').toLowerCase();
+    return counterpartyPatterns.some(p => name.includes(p));
+  });
+}
+
 export async function removeAttachment(
   transactionId: string,
   attachmentId: string
