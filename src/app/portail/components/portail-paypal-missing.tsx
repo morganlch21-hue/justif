@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, CheckCircle, MessageSquare, ArrowDownRight, ArrowUpRight, Receipt, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ArrowDownRight, ArrowUpRight, Receipt, ChevronDown, ChevronUp } from 'lucide-react';
 import type { PayPalTransaction } from '@/lib/types';
 
 interface Props {
