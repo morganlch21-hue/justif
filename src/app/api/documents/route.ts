@@ -17,7 +17,12 @@ export async function GET(request: Request) {
 
     if (monthKey) query = query.eq('month_key', monthKey);
     if (type) query = query.eq('type', type);
-    if (status) query = query.eq('status', status);
+    if (status) {
+      query = query.eq('status', status);
+    } else {
+      // Par défaut, exclure les documents ignorés (non-factures)
+      query = query.neq('status', 'ignored');
+    }
     if (category) query = query.eq('category', category);
 
     const { data, error } = await query;
@@ -34,15 +39,29 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const { id, status } = await request.json();
-    if (!id || !status) {
-      return NextResponse.json({ error: 'id et status requis' }, { status: 400 });
+    const body = await request.json();
+    const { id } = body;
+    if (!id) {
+      return NextResponse.json({ error: 'id requis' }, { status: 400 });
+    }
+
+    // Build update fields from allowed keys
+    const allowedFields = ['status', 'month_key', 'amount_cents', 'extracted_vendor', 'extracted_date', 'title', 'description'];
+    const updateFields: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (body[key] !== undefined) {
+        updateFields[key] = body[key];
+      }
+    }
+
+    if (Object.keys(updateFields).length === 0) {
+      return NextResponse.json({ error: 'Aucun champ à mettre à jour' }, { status: 400 });
     }
 
     const supabase = createServiceClient();
     const { error } = await supabase
       .from('accounting_documents')
-      .update({ status })
+      .update(updateFields)
       .eq('id', id);
 
     if (error) {

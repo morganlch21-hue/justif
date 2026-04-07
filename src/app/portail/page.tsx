@@ -1,10 +1,9 @@
 import { createServiceClient } from '@/lib/supabase';
 import { createServerComponentClient } from '@/lib/supabase-server';
+import { isPortailEmailAllowed } from '@/lib/portail-auth';
 import { createHash } from 'crypto';
 import { redirect } from 'next/navigation';
 import { PortailDashboard } from './portail-dashboard';
-
-const ALLOWED_DOMAIN = '@cpbm.fr';
 
 export default async function PortailPage({
   searchParams,
@@ -45,7 +44,7 @@ export default async function PortailPage({
     const supabase = await createServerComponentClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (user?.email?.endsWith(ALLOWED_DOMAIN)) {
+    if (user?.email && isPortailEmailAllowed(user.email)) {
       return <PortailDashboard />;
     }
   } catch {

@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button';
 import {
   FileText, Camera, FolderOpen,
   CheckCircle, Clock, Receipt, RefreshCw, Loader2,
-  TrendingDown, TrendingUp, Send, AlertTriangle
+  TrendingDown, TrendingUp, Send, AlertTriangle,
+  MessageSquare, Check, X
 } from 'lucide-react';
-import { getCurrentMonthKey, type AccountingDocument, type QontoTransaction } from '@/lib/types';
+import { getCurrentMonthKey, type AccountingDocument, type QontoTransaction, type PayPalTransaction } from '@/lib/types';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -24,6 +25,7 @@ interface DashboardStats {
   toVerify: number;
   sentToQonto: number;
   missingInvoices: QontoTransaction[];
+  missingPayPal: PayPalTransaction[];
 }
 
 export default function DashboardPage() {
@@ -32,6 +34,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [showAllMissing, setShowAllMissing] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
+  const [showAllPayPal, setShowAllPayPal] = useState(false);
+  const [syncingPayPal, setSyncingPayPal] = useState(false);
 
   const fetchStats = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -49,6 +55,15 @@ export default function DashboardPage() {
         }
       } catch { /* Qonto not configured yet */ }
 
+      let missingPP: PayPalTransaction[] = [];
+      try {
+        const ppRes = await fetch(`/api/paypal/missing?month=${month}`);
+        if (ppRes.ok) {
+          const ppData = await ppRes.json();
+          missingPP = ppData.transactions || [];
+        }
+      } catch { /* PayPal not configured yet */ }
+
       setStats({
         totalDocs: docs.length,
         invoices: docs.filter(d => d.type === 'invoice').length,
@@ -58,6 +73,7 @@ export default function DashboardPage() {
         toVerify: docs.filter(d => d.status === 'to_verify').length,
         sentToQonto: docs.filter(d => d.qonto_attachment_sent).length,
         missingInvoices: missing,
+        missingPayPal: missingPP,
       });
     } catch {
       toast.error('Erreur de chargement');
@@ -68,10 +84,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchStats();
-    // Background sync: silently sync Qonto on page load without blocking UI
-    fetch(`/api/qonto/sync?month=${month}`, { method: 'POST' })
-      .then(() => fetchStats(true))
-      .catch(() => {});
+    // Background sync: silently sync Qonto + PayPal on page load without blocking UI
+    Promise.all([
+      fetch(`/api/qonto/sync?month=${month}`, { method: 'POST' }).catch(() => {}),
+      fetch(`/api/paypal/sync?month=${month}`, { method: 'POST' }).catch(() => {}),
+    ])
+      .then(() => fetch(`/api/paypal/auto-match?month=${month}`, { method: 'POST' }).catch(() => {}))
+      .then(() => fetchStats(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchStats]);
 
@@ -95,6 +114,73 @@ export default function DashboardPage() {
       toast.error('Erreur Qonto');
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function syncPayPal() {
+    setSyncingPayPal(true);
+    try {
+      await fetch(`/api/paypal/sync?month=${month}`, { method: 'POST' });
+      await fetch(`/api/paypal/auto-match?month=${month}`, { method: 'POST' });
+      await fetchStats(true);
+      toast.success('PayPal synchronisé');
+    } catch {
+      toast.error('Erreur sync PayPal');
+    } finally {
+      setSyncingPayPal(false);
+    }
+  }
+
+  async function savePayPalNote(txId: string) {
+    try {
+      const res = await fetch('/api/paypal/missing', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId: txId, note: noteText.trim() }),
+      });
+      if (res.ok) {
+        if (stats) {
+          setStats({
+            ...stats,
+            missingPayPal: stats.missingPayPal.map(tx =>
+              tx.id === txId ? { ...tx, note: noteText.trim() || null } : tx
+            ),
+          });
+        }
+        setEditingNoteId(null);
+        setNoteText('');
+        toast.success('Note enregistrée');
+      }
+    } catch {
+      toast.error('Erreur réseau');
+    }
+  }
+
+  async function saveNote(txId: string) {
+    try {
+      const res = await fetch('/api/qonto/missing', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId: txId, note: noteText.trim() }),
+      });
+      if (res.ok) {
+        // Update local state
+        if (stats) {
+          setStats({
+            ...stats,
+            missingInvoices: stats.missingInvoices.map(tx =>
+              tx.id === txId ? { ...tx, note: noteText.trim() || null } : tx
+            ),
+          });
+        }
+        setEditingNoteId(null);
+        setNoteText('');
+        toast.success('Note enregistrée');
+      } else {
+        toast.error('Erreur lors de la sauvegarde');
+      }
+    } catch {
+      toast.error('Erreur réseau');
     }
   }
 
@@ -227,16 +313,46 @@ export default function DashboardPage() {
                   </div>
                   <div className="space-y-1.5">
                     {(showAllMissing ? stats.missingInvoices : stats.missingInvoices.slice(0, 5)).map((tx) => (
-                      <div key={tx.id} className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-sm">
-                        <div className="min-w-0 flex-1">
-                          <span className="font-medium truncate">{tx.counterparty_name || 'Inconnu'}</span>
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            {new Date(tx.settled_at).toLocaleDateString('fr-FR')}
+                      <div key={tx.id} className="rounded-lg bg-white/60 px-3 py-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0 flex-1">
+                            <span className="font-medium truncate">{tx.counterparty_name || 'Inconnu'}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              {new Date(tx.settled_at).toLocaleDateString('fr-FR')}
+                            </span>
+                          </div>
+                          <span className="font-semibold tabular-nums text-amber-800 text-sm shrink-0">
+                            {(Math.abs(tx.amount_cents) / 100).toFixed(2)} €
                           </span>
                         </div>
-                        <span className="font-semibold tabular-nums text-amber-800 text-sm shrink-0">
-                          {(Math.abs(tx.amount_cents) / 100).toFixed(2)} €
-                        </span>
+                        {/* Note display / edit */}
+                        {editingNoteId === tx.id ? (
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={noteText}
+                              onChange={(e) => setNoteText(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') saveNote(tx.id); if (e.key === 'Escape') { setEditingNoteId(null); setNoteText(''); } }}
+                              placeholder="Ex: URSSAF, PER + prévoyance..."
+                              className="flex-1 rounded border border-amber-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+                              autoFocus
+                            />
+                            <button onClick={() => saveNote(tx.id)} className="rounded p-1 text-green-600 hover:bg-green-50">
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                            <button onClick={() => { setEditingNoteId(null); setNoteText(''); }} className="rounded p-1 text-gray-400 hover:bg-gray-100">
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setEditingNoteId(tx.id); setNoteText(tx.note || ''); }}
+                            className="mt-1 flex items-center gap-1 text-[11px] text-amber-600/70 hover:text-amber-800 cursor-pointer"
+                          >
+                            <MessageSquare className="h-3 w-3" />
+                            {tx.note || 'Ajouter une note...'}
+                          </button>
+                        )}
                       </div>
                     ))}
                     {stats.missingInvoices.length > 5 && !showAllMissing && (
@@ -260,7 +376,84 @@ export default function DashboardPage() {
               </Card>
             )}
 
-            {stats.totalDocs === 0 && stats.missingInvoices.length === 0 && (
+            {/* PayPal missing documents */}
+            {stats.missingPayPal.length > 0 && (
+              <Card className="border-blue-200 bg-blue-50/50">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-blue-500" />
+                      <p className="text-sm font-medium text-blue-900">
+                        {stats.missingPayPal.length} paiement(s) PayPal sans facture
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={syncPayPal} disabled={syncingPayPal} className="h-7 text-xs text-blue-600">
+                      {syncingPayPal ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+                      Sync PayPal
+                    </Button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {(showAllPayPal ? stats.missingPayPal : stats.missingPayPal.slice(0, 5)).map((tx) => (
+                      <div key={tx.id} className="rounded-lg bg-white/60 px-3 py-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0 flex-1">
+                            <span className="font-medium truncate">{tx.counterparty_name || tx.counterparty_email || 'Inconnu'}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              {new Date(tx.transaction_date).toLocaleDateString('fr-FR')}
+                            </span>
+                          </div>
+                          <span className="font-semibold tabular-nums text-blue-800 text-sm shrink-0">
+                            {(Math.abs(tx.amount_cents) / 100).toFixed(2)} €
+                          </span>
+                        </div>
+                        {tx.description && (
+                          <p className="text-[10px] text-muted-foreground truncate">{tx.description}</p>
+                        )}
+                        {editingNoteId === tx.id ? (
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={noteText}
+                              onChange={(e) => setNoteText(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') savePayPalNote(tx.id); if (e.key === 'Escape') { setEditingNoteId(null); setNoteText(''); } }}
+                              placeholder="Ex: Vente client, remboursement..."
+                              className="flex-1 rounded border border-blue-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+                              autoFocus
+                            />
+                            <button onClick={() => savePayPalNote(tx.id)} className="rounded p-1 text-green-600 hover:bg-green-50">
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                            <button onClick={() => { setEditingNoteId(null); setNoteText(''); }} className="rounded p-1 text-gray-400 hover:bg-gray-100">
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setEditingNoteId(tx.id); setNoteText(tx.note || ''); }}
+                            className="mt-1 flex items-center gap-1 text-[11px] text-blue-600/70 hover:text-blue-800 cursor-pointer"
+                          >
+                            <MessageSquare className="h-3 w-3" />
+                            {tx.note || 'Ajouter une note...'}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {stats.missingPayPal.length > 5 && !showAllPayPal && (
+                      <button onClick={() => setShowAllPayPal(true)} className="text-xs text-blue-600 pl-3 hover:text-blue-800 hover:underline cursor-pointer">
+                        + {stats.missingPayPal.length - 5} autre(s)
+                      </button>
+                    )}
+                    {showAllPayPal && stats.missingPayPal.length > 5 && (
+                      <button onClick={() => setShowAllPayPal(false)} className="text-xs text-blue-600 pl-3 hover:text-blue-800 hover:underline cursor-pointer">
+                        Voir moins
+                      </button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {stats.totalDocs === 0 && stats.missingInvoices.length === 0 && stats.missingPayPal.length === 0 && (
               <Card>
                 <CardContent className="py-16 text-center">
                   <CheckCircle className="mx-auto h-12 w-12 text-green-500/40" />

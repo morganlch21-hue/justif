@@ -1,0 +1,44 @@
+import { createServiceClient } from '@/lib/supabase';
+import { validatePortailAccess } from '@/lib/portail-auth';
+import { NextResponse } from 'next/server';
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const month = searchParams.get('month');
+
+    if (!month) {
+      return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
+    }
+
+    const { valid } = await validatePortailAccess(request);
+    if (!valid) {
+      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
+    }
+
+    const supabase = createServiceClient();
+
+    const monthStart = `${month}-01T00:00:00Z`;
+    const [year, m] = month.split('-').map(Number);
+    const monthEnd = new Date(year, m, 1).toISOString();
+
+    const { data: transactions, error } = await supabase
+      .from('accounting_paypal_transactions')
+      .select('*')
+      .eq('side', 'debit')
+      .eq('has_document', false)
+      .is('matched_document_id', null)
+      .gte('transaction_date', monthStart)
+      .lt('transaction_date', monthEnd)
+      .gt('amount_cents', 100)
+      .order('transaction_date', { ascending: false });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ transactions: transactions || [] });
+  } catch {
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
+}

@@ -53,6 +53,17 @@ export async function GET(request: Request) {
       ? Math.round((matchedTx.length / debitTx.length) * 100)
       : 100;
 
+    // Get PayPal transactions for this month
+    const { data: paypalTransactions } = await supabase
+      .from('accounting_paypal_transactions')
+      .select('side, has_document, matched_document_id, amount_cents')
+      .gte('transaction_date', monthStart)
+      .lt('transaction_date', monthEnd);
+
+    const allPaypalTx = paypalTransactions || [];
+    const paypalDebitTx = allPaypalTx.filter(t => t.side === 'debit');
+    const paypalMissingTx = paypalDebitTx.filter(t => !t.has_document && !t.matched_document_id);
+
     return NextResponse.json({
       summary: {
         totalDocs: allDocs.length,
@@ -64,6 +75,8 @@ export async function GET(request: Request) {
         totalDebitTransactions: debitTx.length,
         missingCount: missingTx.length,
         reconciliationRate,
+        paypalDebitCount: paypalDebitTx.length,
+        paypalMissingCount: paypalMissingTx.length,
       },
     });
   } catch {

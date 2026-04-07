@@ -54,6 +54,9 @@ export async function POST(request: Request) {
         if (!doc.amount_cents && extractedData.amount_cents) {
           updateFields.amount_cents = extractedData.amount_cents;
         }
+        if (extractedData.currency) {
+          updateFields.currency = extractedData.currency;
+        }
         if (!doc.description && extractedData.description) {
           updateFields.description = extractedData.description;
           updateFields.title = extractedData.description;

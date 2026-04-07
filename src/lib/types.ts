@@ -71,6 +71,25 @@ export interface QontoTransaction {
   side: 'debit' | 'credit';
   has_attachment: boolean;
   matched_document_id: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface PayPalTransaction {
+  id: string;
+  paypal_id: string;
+  amount_cents: number;
+  currency: string;
+  description: string | null;
+  counterparty_name: string | null;
+  counterparty_email: string | null;
+  transaction_date: string;
+  side: 'debit' | 'credit';
+  transaction_type: string | null;
+  has_document: boolean;
+  matched_document_id: string | null;
+  note: string | null;
+  fee_cents: number;
   created_at: string;
 }
 
@@ -105,6 +124,8 @@ export interface PortailSummary {
   totalDebitTransactions: number;
   missingCount: number;
   reconciliationRate: number;
+  paypalDebitCount: number;
+  paypalMissingCount: number;
 }
 
 export interface ReconciliationItem {

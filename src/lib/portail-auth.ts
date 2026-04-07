@@ -3,6 +3,11 @@ import { createServerComponentClient } from '@/lib/supabase-server';
 import { createHash } from 'crypto';
 
 const ALLOWED_DOMAIN = '@cpbm.fr';
+const ALLOWED_EMAILS = ['morgan.lch21@gmail.com'];
+
+export function isPortailEmailAllowed(email: string): boolean {
+  return email.endsWith(ALLOWED_DOMAIN) || ALLOWED_EMAILS.includes(email.toLowerCase());
+}
 
 export async function validatePortailToken(token: string): Promise<{ valid: boolean; tokenId?: string }> {
   const tokenHash = createHash('sha256').update(token).digest('hex');
@@ -47,7 +52,7 @@ export async function validatePortailAccess(request: Request): Promise<{ valid: 
   try {
     const supabase = await createServerComponentClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (user?.email?.endsWith(ALLOWED_DOMAIN)) {
+    if (user?.email && isPortailEmailAllowed(user.email)) {
       return { valid: true, email: user.email };
     }
   } catch {

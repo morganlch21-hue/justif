@@ -104,7 +104,18 @@ export function PortailSummary({ token, month }: Props) {
           <CardContent className="p-3 flex items-center gap-3">
             <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
             <p className="text-xs font-medium text-amber-800">
-              {summary.missingCount} transaction{summary.missingCount > 1 ? 's' : ''} bancaire{summary.missingCount > 1 ? 's' : ''} sans justificatif
+              {summary.missingCount} transaction{summary.missingCount > 1 ? 's' : ''} Qonto sans justificatif
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {summary.paypalMissingCount > 0 && (
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardContent className="p-3 flex items-center gap-3">
+            <AlertTriangle className="h-4 w-4 text-blue-500 shrink-0" />
+            <p className="text-xs font-medium text-blue-800">
+              {summary.paypalMissingCount} transaction{summary.paypalMissingCount > 1 ? 's' : ''} PayPal sans justificatif
             </p>
           </CardContent>
         </Card>

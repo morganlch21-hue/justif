@@ -12,9 +12,11 @@ import { toast } from 'sonner';
 import { FileText, Loader2, Mail } from 'lucide-react';
 
 const ALLOWED_DOMAIN = '@cpbm.fr';
+const ALLOWED_EMAILS = ['morgan.lch21@gmail.com'];
 
 function isAllowedEmail(email: string) {
-  return email.toLowerCase().endsWith(ALLOWED_DOMAIN);
+  const lower = email.toLowerCase();
+  return lower.endsWith(ALLOWED_DOMAIN) || ALLOWED_EMAILS.includes(lower);
 }
 
 export default function PortailLoginPage() {

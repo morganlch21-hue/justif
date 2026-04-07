@@ -12,6 +12,7 @@ import { PortailSummary } from './components/portail-summary';
 import { PortailDocuments } from './components/portail-documents';
 import { PortailReconciliation } from './components/portail-reconciliation';
 import { PortailMissing } from './components/portail-missing';
+import { PortailPaypalMissing } from './components/portail-paypal-missing';
 
 interface Props {
   token?: string;
@@ -20,29 +21,45 @@ interface Props {
 export function PortailDashboard({ token }: Props) {
   const [month, setMonth] = useState(getCurrentMonthKey());
   const [missingCount, setMissingCount] = useState(0);
+  const [paypalMissingCount, setPaypalMissingCount] = useState(0);
   const router = useRouter();
   const isSessionMode = !token;
 
   // Build query string for API calls
   const authQuery = token ? `token=${token}` : '';
 
-  // Sync Qonto in background on load, then fetch missing count
+  // Sync Qonto + PayPal in background on load, then fetch missing counts
   useEffect(() => {
     const syncThenFetchMissing = async () => {
       try {
-        await fetch(`/api/qonto/sync?month=${month}`, { method: 'POST' });
+        await Promise.all([
+          fetch(`/api/qonto/sync?month=${month}`, { method: 'POST' }),
+          fetch(`/api/paypal/sync?month=${month}`, { method: 'POST' }),
+        ]);
+        await fetch(`/api/paypal/auto-match?month=${month}`, { method: 'POST' });
       } catch { /* ignore sync errors */ }
       try {
-        const r = await fetch(`/api/portail/missing?month=${month}&${authQuery}`);
-        const data = await r.json();
-        setMissingCount((data.transactions || []).length);
-      } catch { setMissingCount(0); }
+        const [qontoRes, paypalRes] = await Promise.all([
+          fetch(`/api/portail/missing?month=${month}&${authQuery}`),
+          fetch(`/api/portail/paypal-missing?month=${month}&${authQuery}`),
+        ]);
+        const [qontoData, paypalData] = await Promise.all([qontoRes.json(), paypalRes.json()]);
+        setMissingCount((qontoData.transactions || []).length);
+        setPaypalMissingCount((paypalData.transactions || []).length);
+      } catch {
+        setMissingCount(0);
+        setPaypalMissingCount(0);
+      }
     };
     syncThenFetchMissing();
   }, [month, authQuery]);
 
   const handleMissingCount = useCallback((count: number) => {
     setMissingCount(count);
+  }, []);
+
+  const handlePaypalMissingCount = useCallback((count: number) => {
+    setPaypalMissingCount(count);
   }, []);
 
   async function handleLogout() {
@@ -93,6 +110,14 @@ export function PortailDashboard({ token }: Props) {
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="paypal" className="flex-1 relative">
+              PayPal
+              {paypalMissingCount > 0 && (
+                <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[10px] font-bold text-white">
+                  {paypalMissingCount}
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="documents" className="mt-4">
@@ -105,6 +130,10 @@ export function PortailDashboard({ token }: Props) {
 
           <TabsContent value="missing" className="mt-4">
             <PortailMissing token={token} month={month} onCountChange={handleMissingCount} />
+          </TabsContent>
+
+          <TabsContent value="paypal" className="mt-4">
+            <PortailPaypalMissing token={token} month={month} onCountChange={handlePaypalMissingCount} />
           </TabsContent>
         </Tabs>
       </main>
