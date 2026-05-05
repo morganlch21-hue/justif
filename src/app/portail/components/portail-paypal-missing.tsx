@@ -39,7 +39,7 @@ export function PortailPaypalMissing({ token, month, onCountChange }: Props) {
 
     Promise.all([
       fetch(`/api/portail/paypal-missing?month=${month}${authParam}`).then(r => r.json()),
-      fetch(`/api/paypal/fees?month=${month}`).then(r => r.json()),
+      fetch(`/api/portail/paypal-fees?month=${month}${authParam}`).then(r => r.json()),
     ])
       .then(([missingData, feesData]) => {
         const missing = missingData.transactions || [];

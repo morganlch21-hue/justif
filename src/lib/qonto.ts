@@ -57,7 +57,8 @@ export async function uploadAttachment(
   transactionId: string,
   file: Buffer,
   fileName: string,
-  contentType: string
+  contentType: string,
+  idempotencyKey?: string
 ) {
   const formData = new FormData();
   formData.append('file', new Blob([file as unknown as BlobPart], { type: contentType }), fileName);
@@ -68,7 +69,8 @@ export async function uploadAttachment(
       method: 'POST',
       headers: {
         'Authorization': `${process.env.QONTO_LOGIN}:${process.env.QONTO_SECRET_KEY}`,
-        'X-Qonto-Idempotency-Key': crypto.randomUUID(),
+        // Deterministic per (transaction, file) so retries are idempotent on Qonto's side.
+        'X-Qonto-Idempotency-Key': idempotencyKey || crypto.randomUUID(),
       },
       body: formData,
     }

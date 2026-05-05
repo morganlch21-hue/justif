@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase';
+import { extractDocument } from '@/lib/process-document';
 import { NextResponse } from 'next/server';
 
 interface GmailPayload {
@@ -17,6 +18,7 @@ interface GmailPayload {
 }
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
@@ -128,14 +130,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erreur base de données' }, { status: 500 });
     }
 
-    // Update sync state
+    // Update sync state. Use an RPC-free upsert that increments emails_processed
+    // by reading current value first (still racy but OK for a counter).
+    const { data: existingSync } = await supabase
+      .from('accounting_gmail_sync_state')
+      .select('emails_processed')
+      .eq('email_account', payload.emailAccount)
+      .maybeSingle();
     await supabase
       .from('accounting_gmail_sync_state')
       .upsert({
         email_account: payload.emailAccount,
         last_synced_at: new Date().toISOString(),
-        emails_processed: 1, // Will be incremented
+        emails_processed: (existingSync?.emails_processed || 0) + 1,
       }, { onConflict: 'email_account' });
+
+    // Run AI extraction inline so the doc has structured fields ready for matching.
+    // Auto-push to Qonto is left to the cron / dashboard sync to keep this webhook fast-ish.
+    if (status !== 'ignored') {
+      try {
+        await extractDocument(docId);
+      } catch (extractErr) {
+        console.error('[gmail/receive] Extraction failed (non-blocking):', extractErr);
+      }
+    }
 
     return NextResponse.json({ document: data });
   } catch (err) {

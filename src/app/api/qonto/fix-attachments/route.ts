@@ -65,7 +65,7 @@ export async function POST(request: Request) {
 
         // Upload to correct transaction
         const buffer = Buffer.from(await fileData.arrayBuffer());
-        await uploadAttachment(fix.correctTxId, buffer, doc.file_name, doc.file_type);
+        await uploadAttachment(fix.correctTxId, buffer, doc.file_name, doc.file_type, `${fix.docId}_${fix.correctTxId}`);
 
         // Update accounting_documents
         await supabase

@@ -38,12 +38,13 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await fileData.arrayBuffer());
 
-    // Push to Qonto
+    // Push to Qonto with deterministic idempotency so retries are safe.
     await uploadAttachment(
       qontoTransactionId,
       buffer,
       doc.file_name,
-      doc.file_type
+      doc.file_type,
+      `${documentId}_${qontoTransactionId}`
     );
 
     // Update document record

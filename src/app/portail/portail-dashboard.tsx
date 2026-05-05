@@ -28,15 +28,13 @@ export function PortailDashboard({ token }: Props) {
   // Build query string for API calls
   const authQuery = token ? `token=${token}` : '';
 
-  // Sync Qonto + PayPal in background on load, then fetch missing counts
+  // Sync Qonto + PayPal in background on load, then fetch missing counts.
+  // Uses /api/portail/sync (token-or-session auth) since /api/qonto/sync etc.
+  // require a dashboard Supabase session.
   useEffect(() => {
     const syncThenFetchMissing = async () => {
       try {
-        await Promise.all([
-          fetch(`/api/qonto/sync?month=${month}`, { method: 'POST' }),
-          fetch(`/api/paypal/sync?month=${month}`, { method: 'POST' }),
-        ]);
-        await fetch(`/api/paypal/auto-match?month=${month}`, { method: 'POST' });
+        await fetch(`/api/portail/sync?month=${month}&${authQuery}`, { method: 'POST' });
       } catch { /* ignore sync errors */ }
       try {
         const [qontoRes, paypalRes] = await Promise.all([
