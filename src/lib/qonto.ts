@@ -271,6 +271,37 @@ export async function getTransaction(transactionId: string) {
   return res.json();
 }
 
+export interface QontoAttachmentAPI {
+  id: string;
+  created_at: string;
+  file_name: string;
+  file_size: number | string; // string per docs, but seen as number — handle both
+  file_content_type: string;
+  url: string; // presigned, ~1h TTL
+}
+
+/**
+ * Fetch a single attachment's metadata + presigned download URL.
+ * The URL is short-lived (~1h).
+ */
+export async function getAttachment(attachmentId: string): Promise<QontoAttachmentAPI> {
+  const res = await fetch(
+    `${QONTO_BASE_URL}/attachments/${attachmentId}`,
+    { headers: getHeaders() }
+  );
+  if (!res.ok) throw new Error(`Qonto attachment fetch error: ${res.status}`);
+  const data = await res.json();
+  return data.attachment as QontoAttachmentAPI;
+}
+
+/** Download an attachment's binary content from its presigned URL. */
+export async function downloadAttachmentFile(url: string): Promise<Buffer> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Attachment download failed: ${res.status}`);
+  const buf = await res.arrayBuffer();
+  return Buffer.from(buf);
+}
+
 // Get month range for querying transactions
 export function getMonthRange(monthKey: string) {
   const [year, month] = monthKey.split('-').map(Number);

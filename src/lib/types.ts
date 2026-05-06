@@ -1,5 +1,5 @@
 export type DocumentType = 'invoice' | 'ticket';
-export type DocumentSource = 'gmail' | 'upload' | 'manual';
+export type DocumentSource = 'gmail' | 'upload' | 'manual' | 'qonto';
 export type SenderAction = 'always_import' | 'always_ignore';
 
 export interface AccountingDocument {

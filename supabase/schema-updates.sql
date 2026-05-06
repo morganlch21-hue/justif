@@ -14,6 +14,7 @@ ALTER TABLE accounting_documents
   ADD COLUMN IF NOT EXISTS extraction_status      text CHECK (extraction_status IN ('success', 'failed', 'timeout')),
   ADD COLUMN IF NOT EXISTS qonto_multi_tx_ids     text[],
   ADD COLUMN IF NOT EXISTS qonto_processing_at    timestamptz,
+  ADD COLUMN IF NOT EXISTS qonto_attachment_id    text,
   ADD COLUMN IF NOT EXISTS paypal_transaction_id  text;
 
 -- Élargir le CHECK status pour inclure 'no_qonto_match'
@@ -22,9 +23,17 @@ ALTER TABLE accounting_documents
   ADD CONSTRAINT accounting_documents_status_check
   CHECK (status IN ('confirmed', 'to_verify', 'ignored', 'no_qonto_match'));
 
+-- Élargir source pour inclure 'qonto' (factures importées depuis Qonto)
+ALTER TABLE accounting_documents DROP CONSTRAINT IF EXISTS accounting_documents_source_check;
+ALTER TABLE accounting_documents
+  ADD CONSTRAINT accounting_documents_source_check
+  CHECK (source IN ('gmail', 'upload', 'manual', 'qonto'));
+
 -- Index utiles
 CREATE INDEX IF NOT EXISTS idx_docs_paypal_tx ON accounting_documents(paypal_transaction_id) WHERE paypal_transaction_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_docs_processing ON accounting_documents(qonto_processing_at) WHERE qonto_processing_at IS NOT NULL;
+-- Unique pour dédup à l'import : un attachment Qonto = un seul doc
+CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_qonto_attachment_id ON accounting_documents(qonto_attachment_id) WHERE qonto_attachment_id IS NOT NULL;
 
 -- ------------------------------------------------------------
 -- 2. accounting_qonto_transactions : note libre (pour expliquer un débit sans facture)
